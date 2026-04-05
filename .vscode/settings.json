@@ -1,0 +1,6 @@
+{
+    "cmake.configureArgs": [
+        "-DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.5/bin/nvcc"
+    ],
+    "cmake.buildType": "Release"
+}

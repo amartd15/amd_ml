@@ -1,0 +1,26 @@
+
+# Consider dependencies only in project.
+set(CMAKE_DEPENDS_IN_PROJECT_ONLY OFF)
+
+# The set of languages for which implicit dependencies are needed:
+set(CMAKE_DEPENDS_LANGUAGES
+  )
+
+# The set of dependency files which are needed:
+set(CMAKE_DEPENDS_DEPENDENCY_FILES
+  "/home/adrian/prueba/amd_ml/src/amdMemoryManagement.cu" "CMakeFiles/amd_ml.dir/src/amdMemoryManagement.cu.o" "gcc" "CMakeFiles/amd_ml.dir/src/amdMemoryManagement.cu.o.d"
+  "/home/adrian/prueba/amd_ml/src/lr/amdLinearRegression.cu" "CMakeFiles/amd_ml.dir/src/lr/amdLinearRegression.cu.o" "gcc" "CMakeFiles/amd_ml.dir/src/lr/amdLinearRegression.cu.o.d"
+  "/home/adrian/prueba/amd_ml/src/lr/kernelLinearRegresion.cu" "CMakeFiles/amd_ml.dir/src/lr/kernelLinearRegresion.cu.o" "gcc" "CMakeFiles/amd_ml.dir/src/lr/kernelLinearRegresion.cu.o.d"
+  "/home/adrian/prueba/amd_ml/src/main.cu" "CMakeFiles/amd_ml.dir/src/main.cu.o" "gcc" "CMakeFiles/amd_ml.dir/src/main.cu.o.d"
+  )
+
+# Targets to which this target links which contain Fortran sources.
+set(CMAKE_Fortran_TARGET_LINKED_INFO_FILES
+  )
+
+# Targets to which this target links which contain Fortran sources.
+set(CMAKE_Fortran_TARGET_FORWARD_LINKED_INFO_FILES
+  )
+
+# Fortran module output directory.
+set(CMAKE_Fortran_TARGET_MODULE_DIR "")
