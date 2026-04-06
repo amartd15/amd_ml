@@ -1,6 +1,5 @@
 *.exe
 *.csv
 build
-bin
 .vscode
 *.png
