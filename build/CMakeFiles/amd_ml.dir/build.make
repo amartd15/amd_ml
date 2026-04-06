@@ -69,56 +69,11 @@ include CMakeFiles/amd_ml.dir/progress.make
 # Include the compile flags for this target's objects.
 include CMakeFiles/amd_ml.dir/flags.make
 
-CMakeFiles/amd_ml.dir/src/amdMemoryManagement.cu.o: CMakeFiles/amd_ml.dir/flags.make
-CMakeFiles/amd_ml.dir/src/amdMemoryManagement.cu.o: CMakeFiles/amd_ml.dir/includes_CUDA.rsp
-CMakeFiles/amd_ml.dir/src/amdMemoryManagement.cu.o: /home/adrian/prueba/amd_ml/src/amdMemoryManagement.cu
-CMakeFiles/amd_ml.dir/src/amdMemoryManagement.cu.o: CMakeFiles/amd_ml.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/adrian/prueba/amd_ml/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CUDA object CMakeFiles/amd_ml.dir/src/amdMemoryManagement.cu.o"
-	/usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT CMakeFiles/amd_ml.dir/src/amdMemoryManagement.cu.o -MF CMakeFiles/amd_ml.dir/src/amdMemoryManagement.cu.o.d -x cu -c /home/adrian/prueba/amd_ml/src/amdMemoryManagement.cu -o CMakeFiles/amd_ml.dir/src/amdMemoryManagement.cu.o
-
-CMakeFiles/amd_ml.dir/src/amdMemoryManagement.cu.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/amd_ml.dir/src/amdMemoryManagement.cu.i"
-	$(CMAKE_COMMAND) -E cmake_unimplemented_variable CMAKE_CUDA_CREATE_PREPROCESSED_SOURCE
-
-CMakeFiles/amd_ml.dir/src/amdMemoryManagement.cu.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CUDA source to assembly CMakeFiles/amd_ml.dir/src/amdMemoryManagement.cu.s"
-	$(CMAKE_COMMAND) -E cmake_unimplemented_variable CMAKE_CUDA_CREATE_ASSEMBLY_SOURCE
-
-CMakeFiles/amd_ml.dir/src/lr/amdLinearRegression.cu.o: CMakeFiles/amd_ml.dir/flags.make
-CMakeFiles/amd_ml.dir/src/lr/amdLinearRegression.cu.o: CMakeFiles/amd_ml.dir/includes_CUDA.rsp
-CMakeFiles/amd_ml.dir/src/lr/amdLinearRegression.cu.o: /home/adrian/prueba/amd_ml/src/lr/amdLinearRegression.cu
-CMakeFiles/amd_ml.dir/src/lr/amdLinearRegression.cu.o: CMakeFiles/amd_ml.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/adrian/prueba/amd_ml/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CUDA object CMakeFiles/amd_ml.dir/src/lr/amdLinearRegression.cu.o"
-	/usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT CMakeFiles/amd_ml.dir/src/lr/amdLinearRegression.cu.o -MF CMakeFiles/amd_ml.dir/src/lr/amdLinearRegression.cu.o.d -x cu -c /home/adrian/prueba/amd_ml/src/lr/amdLinearRegression.cu -o CMakeFiles/amd_ml.dir/src/lr/amdLinearRegression.cu.o
-
-CMakeFiles/amd_ml.dir/src/lr/amdLinearRegression.cu.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/amd_ml.dir/src/lr/amdLinearRegression.cu.i"
-	$(CMAKE_COMMAND) -E cmake_unimplemented_variable CMAKE_CUDA_CREATE_PREPROCESSED_SOURCE
-
-CMakeFiles/amd_ml.dir/src/lr/amdLinearRegression.cu.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CUDA source to assembly CMakeFiles/amd_ml.dir/src/lr/amdLinearRegression.cu.s"
-	$(CMAKE_COMMAND) -E cmake_unimplemented_variable CMAKE_CUDA_CREATE_ASSEMBLY_SOURCE
-
-CMakeFiles/amd_ml.dir/src/lr/kernelLinearRegresion.cu.o: CMakeFiles/amd_ml.dir/flags.make
-CMakeFiles/amd_ml.dir/src/lr/kernelLinearRegresion.cu.o: CMakeFiles/amd_ml.dir/includes_CUDA.rsp
-CMakeFiles/amd_ml.dir/src/lr/kernelLinearRegresion.cu.o: /home/adrian/prueba/amd_ml/src/lr/kernelLinearRegresion.cu
-CMakeFiles/amd_ml.dir/src/lr/kernelLinearRegresion.cu.o: CMakeFiles/amd_ml.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/adrian/prueba/amd_ml/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CUDA object CMakeFiles/amd_ml.dir/src/lr/kernelLinearRegresion.cu.o"
-	/usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT CMakeFiles/amd_ml.dir/src/lr/kernelLinearRegresion.cu.o -MF CMakeFiles/amd_ml.dir/src/lr/kernelLinearRegresion.cu.o.d -x cu -c /home/adrian/prueba/amd_ml/src/lr/kernelLinearRegresion.cu -o CMakeFiles/amd_ml.dir/src/lr/kernelLinearRegresion.cu.o
-
-CMakeFiles/amd_ml.dir/src/lr/kernelLinearRegresion.cu.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CUDA source to CMakeFiles/amd_ml.dir/src/lr/kernelLinearRegresion.cu.i"
-	$(CMAKE_COMMAND) -E cmake_unimplemented_variable CMAKE_CUDA_CREATE_PREPROCESSED_SOURCE
-
-CMakeFiles/amd_ml.dir/src/lr/kernelLinearRegresion.cu.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CUDA source to assembly CMakeFiles/amd_ml.dir/src/lr/kernelLinearRegresion.cu.s"
-	$(CMAKE_COMMAND) -E cmake_unimplemented_variable CMAKE_CUDA_CREATE_ASSEMBLY_SOURCE
-
 CMakeFiles/amd_ml.dir/src/main.cu.o: CMakeFiles/amd_ml.dir/flags.make
 CMakeFiles/amd_ml.dir/src/main.cu.o: CMakeFiles/amd_ml.dir/includes_CUDA.rsp
 CMakeFiles/amd_ml.dir/src/main.cu.o: /home/adrian/prueba/amd_ml/src/main.cu
 CMakeFiles/amd_ml.dir/src/main.cu.o: CMakeFiles/amd_ml.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/adrian/prueba/amd_ml/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CUDA object CMakeFiles/amd_ml.dir/src/main.cu.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/adrian/prueba/amd_ml/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CUDA object CMakeFiles/amd_ml.dir/src/main.cu.o"
 	/usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler $(CUDA_DEFINES) $(CUDA_INCLUDES) $(CUDA_FLAGS) -MD -MT CMakeFiles/amd_ml.dir/src/main.cu.o -MF CMakeFiles/amd_ml.dir/src/main.cu.o.d -x cu -c /home/adrian/prueba/amd_ml/src/main.cu -o CMakeFiles/amd_ml.dir/src/main.cu.o
 
 CMakeFiles/amd_ml.dir/src/main.cu.i: cmake_force
@@ -131,23 +86,18 @@ CMakeFiles/amd_ml.dir/src/main.cu.s: cmake_force
 
 # Object files for target amd_ml
 amd_ml_OBJECTS = \
-"CMakeFiles/amd_ml.dir/src/amdMemoryManagement.cu.o" \
-"CMakeFiles/amd_ml.dir/src/lr/amdLinearRegression.cu.o" \
-"CMakeFiles/amd_ml.dir/src/lr/kernelLinearRegresion.cu.o" \
 "CMakeFiles/amd_ml.dir/src/main.cu.o"
 
 # External object files for target amd_ml
 amd_ml_EXTERNAL_OBJECTS =
 
-amd_ml: CMakeFiles/amd_ml.dir/src/amdMemoryManagement.cu.o
-amd_ml: CMakeFiles/amd_ml.dir/src/lr/amdLinearRegression.cu.o
-amd_ml: CMakeFiles/amd_ml.dir/src/lr/kernelLinearRegresion.cu.o
 amd_ml: CMakeFiles/amd_ml.dir/src/main.cu.o
 amd_ml: CMakeFiles/amd_ml.dir/build.make
+amd_ml: libamd_ml_core.so
 amd_ml: CMakeFiles/amd_ml.dir/linkLibs.rsp
 amd_ml: CMakeFiles/amd_ml.dir/objects1.rsp
 amd_ml: CMakeFiles/amd_ml.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/adrian/prueba/amd_ml/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Linking CUDA executable amd_ml"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/adrian/prueba/amd_ml/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CUDA executable amd_ml"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/amd_ml.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.

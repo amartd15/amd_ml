@@ -1,26 +1,32 @@
 [
 {
   "directory": "/home/adrian/prueba/amd_ml/build",
-  "command": "/usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler  --options-file CMakeFiles/amd_ml.dir/includes_CUDA.rsp -g -std=c++17 -arch=native -x cu -c /home/adrian/prueba/amd_ml/src/amdMemoryManagement.cu -o CMakeFiles/amd_ml.dir/src/amdMemoryManagement.cu.o",
+  "command": "/usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler -Damd_ml_core_EXPORTS --options-file CMakeFiles/amd_ml_core.dir/includes_CUDA.rsp -g -std=c++17 -arch=native -Xcompiler=-fPIC -x cu -rdc=true -c /home/adrian/prueba/amd_ml/src/amdMemoryManagement.cu -o CMakeFiles/amd_ml_core.dir/src/amdMemoryManagement.cu.o",
   "file": "/home/adrian/prueba/amd_ml/src/amdMemoryManagement.cu",
-  "output": "CMakeFiles/amd_ml.dir/src/amdMemoryManagement.cu.o"
+  "output": "CMakeFiles/amd_ml_core.dir/src/amdMemoryManagement.cu.o"
 },
 {
   "directory": "/home/adrian/prueba/amd_ml/build",
-  "command": "/usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler  --options-file CMakeFiles/amd_ml.dir/includes_CUDA.rsp -g -std=c++17 -arch=native -x cu -c /home/adrian/prueba/amd_ml/src/lr/amdLinearRegression.cu -o CMakeFiles/amd_ml.dir/src/lr/amdLinearRegression.cu.o",
+  "command": "/usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler -Damd_ml_core_EXPORTS --options-file CMakeFiles/amd_ml_core.dir/includes_CUDA.rsp -g -std=c++17 -arch=native -Xcompiler=-fPIC -x cu -rdc=true -c /home/adrian/prueba/amd_ml/src/lr/amdLinearRegression.cu -o CMakeFiles/amd_ml_core.dir/src/lr/amdLinearRegression.cu.o",
   "file": "/home/adrian/prueba/amd_ml/src/lr/amdLinearRegression.cu",
-  "output": "CMakeFiles/amd_ml.dir/src/lr/amdLinearRegression.cu.o"
+  "output": "CMakeFiles/amd_ml_core.dir/src/lr/amdLinearRegression.cu.o"
 },
 {
   "directory": "/home/adrian/prueba/amd_ml/build",
-  "command": "/usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler  --options-file CMakeFiles/amd_ml.dir/includes_CUDA.rsp -g -std=c++17 -arch=native -x cu -c /home/adrian/prueba/amd_ml/src/lr/kernelLinearRegresion.cu -o CMakeFiles/amd_ml.dir/src/lr/kernelLinearRegresion.cu.o",
+  "command": "/usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler -Damd_ml_core_EXPORTS --options-file CMakeFiles/amd_ml_core.dir/includes_CUDA.rsp -g -std=c++17 -arch=native -Xcompiler=-fPIC -x cu -rdc=true -c /home/adrian/prueba/amd_ml/src/lr/kernelLinearRegresion.cu -o CMakeFiles/amd_ml_core.dir/src/lr/kernelLinearRegresion.cu.o",
   "file": "/home/adrian/prueba/amd_ml/src/lr/kernelLinearRegresion.cu",
-  "output": "CMakeFiles/amd_ml.dir/src/lr/kernelLinearRegresion.cu.o"
+  "output": "CMakeFiles/amd_ml_core.dir/src/lr/kernelLinearRegresion.cu.o"
 },
 {
   "directory": "/home/adrian/prueba/amd_ml/build",
   "command": "/usr/local/cuda-12.5/bin/nvcc -forward-unknown-to-host-compiler  --options-file CMakeFiles/amd_ml.dir/includes_CUDA.rsp -g -std=c++17 -arch=native -x cu -c /home/adrian/prueba/amd_ml/src/main.cu -o CMakeFiles/amd_ml.dir/src/main.cu.o",
   "file": "/home/adrian/prueba/amd_ml/src/main.cu",
   "output": "CMakeFiles/amd_ml.dir/src/main.cu.o"
+},
+{
+  "directory": "/home/adrian/prueba/amd_ml/build",
+  "command": "/usr/bin/g++ -Damd_ml_py_EXPORTS -I/home/adrian/prueba/amd_ml/include -isystem /usr/include/python3.12 -g -std=gnu++17 -fPIC -fvisibility=hidden -o CMakeFiles/amd_ml_py.dir/bindings/amd_ml_bindings.cpp.o -c /home/adrian/prueba/amd_ml/bindings/amd_ml_bindings.cpp",
+  "file": "/home/adrian/prueba/amd_ml/bindings/amd_ml_bindings.cpp",
+  "output": "CMakeFiles/amd_ml_py.dir/bindings/amd_ml_bindings.cpp.o"
 }
 ]

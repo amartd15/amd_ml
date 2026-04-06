@@ -1,10 +1,4 @@
 file(REMOVE_RECURSE
-  "CMakeFiles/amd_ml.dir/src/amdMemoryManagement.cu.o"
-  "CMakeFiles/amd_ml.dir/src/amdMemoryManagement.cu.o.d"
-  "CMakeFiles/amd_ml.dir/src/lr/amdLinearRegression.cu.o"
-  "CMakeFiles/amd_ml.dir/src/lr/amdLinearRegression.cu.o.d"
-  "CMakeFiles/amd_ml.dir/src/lr/kernelLinearRegresion.cu.o"
-  "CMakeFiles/amd_ml.dir/src/lr/kernelLinearRegresion.cu.o.d"
   "CMakeFiles/amd_ml.dir/src/main.cu.o"
   "CMakeFiles/amd_ml.dir/src/main.cu.o.d"
   "amd_ml"

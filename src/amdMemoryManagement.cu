@@ -141,17 +141,17 @@ __host__ void freeTensor(tensor* data, bias decision){
 
     }
 
-    if(decision == NO_BIAS){
-        free(data->data_h);
+    // if(decision == NO_BIAS){
+    //     free(data->data_h);
 
-    }else{
-        err = cudaFreeHost(data->data_h);
-        if(err != cudaSuccess){
-            std::cout << "Error freeing pinned memory from the tensor. " << cudaGetErrorString(err) << std::endl;
-            exit(EXIT_FAILURE); 
+    // }else{
+    //     err = cudaFreeHost(data->data_h);
+    //     if(err != cudaSuccess){
+    //         std::cout << "Error freeing pinned memory from the tensor. " << cudaGetErrorString(err) << std::endl;
+    //         exit(EXIT_FAILURE); 
 
-        }
-    }
+    //     }
+    // }
 
     free(data);
 };

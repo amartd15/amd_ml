@@ -117,6 +117,19 @@ depend:
 .PHONY : depend
 
 #=============================================================================
+# Target rules for targets named amd_ml_core
+
+# Build rule for target.
+amd_ml_core: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 amd_ml_core
+.PHONY : amd_ml_core
+
+# fast build rule for target.
+amd_ml_core/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/amd_ml_core.dir/build.make CMakeFiles/amd_ml_core.dir/build
+.PHONY : amd_ml_core/fast
+
+#=============================================================================
 # Target rules for targets named amd_ml
 
 # Build rule for target.
@@ -129,12 +142,49 @@ amd_ml/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/amd_ml.dir/build.make CMakeFiles/amd_ml.dir/build
 .PHONY : amd_ml/fast
 
+#=============================================================================
+# Target rules for targets named amd_ml_py
+
+# Build rule for target.
+amd_ml_py: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 amd_ml_py
+.PHONY : amd_ml_py
+
+# fast build rule for target.
+amd_ml_py/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/amd_ml_py.dir/build.make CMakeFiles/amd_ml_py.dir/build
+.PHONY : amd_ml_py/fast
+
+bindings/amd_ml_bindings.o: bindings/amd_ml_bindings.cpp.o
+.PHONY : bindings/amd_ml_bindings.o
+
+# target to build an object file
+bindings/amd_ml_bindings.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/amd_ml_py.dir/build.make CMakeFiles/amd_ml_py.dir/bindings/amd_ml_bindings.cpp.o
+.PHONY : bindings/amd_ml_bindings.cpp.o
+
+bindings/amd_ml_bindings.i: bindings/amd_ml_bindings.cpp.i
+.PHONY : bindings/amd_ml_bindings.i
+
+# target to preprocess a source file
+bindings/amd_ml_bindings.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/amd_ml_py.dir/build.make CMakeFiles/amd_ml_py.dir/bindings/amd_ml_bindings.cpp.i
+.PHONY : bindings/amd_ml_bindings.cpp.i
+
+bindings/amd_ml_bindings.s: bindings/amd_ml_bindings.cpp.s
+.PHONY : bindings/amd_ml_bindings.s
+
+# target to generate assembly for a file
+bindings/amd_ml_bindings.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/amd_ml_py.dir/build.make CMakeFiles/amd_ml_py.dir/bindings/amd_ml_bindings.cpp.s
+.PHONY : bindings/amd_ml_bindings.cpp.s
+
 src/amdMemoryManagement.o: src/amdMemoryManagement.cu.o
 .PHONY : src/amdMemoryManagement.o
 
 # target to build an object file
 src/amdMemoryManagement.cu.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/amd_ml.dir/build.make CMakeFiles/amd_ml.dir/src/amdMemoryManagement.cu.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/amd_ml_core.dir/build.make CMakeFiles/amd_ml_core.dir/src/amdMemoryManagement.cu.o
 .PHONY : src/amdMemoryManagement.cu.o
 
 src/amdMemoryManagement.i: src/amdMemoryManagement.cu.i
@@ -142,7 +192,7 @@ src/amdMemoryManagement.i: src/amdMemoryManagement.cu.i
 
 # target to preprocess a source file
 src/amdMemoryManagement.cu.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/amd_ml.dir/build.make CMakeFiles/amd_ml.dir/src/amdMemoryManagement.cu.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/amd_ml_core.dir/build.make CMakeFiles/amd_ml_core.dir/src/amdMemoryManagement.cu.i
 .PHONY : src/amdMemoryManagement.cu.i
 
 src/amdMemoryManagement.s: src/amdMemoryManagement.cu.s
@@ -150,7 +200,7 @@ src/amdMemoryManagement.s: src/amdMemoryManagement.cu.s
 
 # target to generate assembly for a file
 src/amdMemoryManagement.cu.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/amd_ml.dir/build.make CMakeFiles/amd_ml.dir/src/amdMemoryManagement.cu.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/amd_ml_core.dir/build.make CMakeFiles/amd_ml_core.dir/src/amdMemoryManagement.cu.s
 .PHONY : src/amdMemoryManagement.cu.s
 
 src/lr/amdLinearRegression.o: src/lr/amdLinearRegression.cu.o
@@ -158,7 +208,7 @@ src/lr/amdLinearRegression.o: src/lr/amdLinearRegression.cu.o
 
 # target to build an object file
 src/lr/amdLinearRegression.cu.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/amd_ml.dir/build.make CMakeFiles/amd_ml.dir/src/lr/amdLinearRegression.cu.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/amd_ml_core.dir/build.make CMakeFiles/amd_ml_core.dir/src/lr/amdLinearRegression.cu.o
 .PHONY : src/lr/amdLinearRegression.cu.o
 
 src/lr/amdLinearRegression.i: src/lr/amdLinearRegression.cu.i
@@ -166,7 +216,7 @@ src/lr/amdLinearRegression.i: src/lr/amdLinearRegression.cu.i
 
 # target to preprocess a source file
 src/lr/amdLinearRegression.cu.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/amd_ml.dir/build.make CMakeFiles/amd_ml.dir/src/lr/amdLinearRegression.cu.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/amd_ml_core.dir/build.make CMakeFiles/amd_ml_core.dir/src/lr/amdLinearRegression.cu.i
 .PHONY : src/lr/amdLinearRegression.cu.i
 
 src/lr/amdLinearRegression.s: src/lr/amdLinearRegression.cu.s
@@ -174,7 +224,7 @@ src/lr/amdLinearRegression.s: src/lr/amdLinearRegression.cu.s
 
 # target to generate assembly for a file
 src/lr/amdLinearRegression.cu.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/amd_ml.dir/build.make CMakeFiles/amd_ml.dir/src/lr/amdLinearRegression.cu.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/amd_ml_core.dir/build.make CMakeFiles/amd_ml_core.dir/src/lr/amdLinearRegression.cu.s
 .PHONY : src/lr/amdLinearRegression.cu.s
 
 src/lr/kernelLinearRegresion.o: src/lr/kernelLinearRegresion.cu.o
@@ -182,7 +232,7 @@ src/lr/kernelLinearRegresion.o: src/lr/kernelLinearRegresion.cu.o
 
 # target to build an object file
 src/lr/kernelLinearRegresion.cu.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/amd_ml.dir/build.make CMakeFiles/amd_ml.dir/src/lr/kernelLinearRegresion.cu.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/amd_ml_core.dir/build.make CMakeFiles/amd_ml_core.dir/src/lr/kernelLinearRegresion.cu.o
 .PHONY : src/lr/kernelLinearRegresion.cu.o
 
 src/lr/kernelLinearRegresion.i: src/lr/kernelLinearRegresion.cu.i
@@ -190,7 +240,7 @@ src/lr/kernelLinearRegresion.i: src/lr/kernelLinearRegresion.cu.i
 
 # target to preprocess a source file
 src/lr/kernelLinearRegresion.cu.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/amd_ml.dir/build.make CMakeFiles/amd_ml.dir/src/lr/kernelLinearRegresion.cu.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/amd_ml_core.dir/build.make CMakeFiles/amd_ml_core.dir/src/lr/kernelLinearRegresion.cu.i
 .PHONY : src/lr/kernelLinearRegresion.cu.i
 
 src/lr/kernelLinearRegresion.s: src/lr/kernelLinearRegresion.cu.s
@@ -198,7 +248,7 @@ src/lr/kernelLinearRegresion.s: src/lr/kernelLinearRegresion.cu.s
 
 # target to generate assembly for a file
 src/lr/kernelLinearRegresion.cu.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/amd_ml.dir/build.make CMakeFiles/amd_ml.dir/src/lr/kernelLinearRegresion.cu.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/amd_ml_core.dir/build.make CMakeFiles/amd_ml_core.dir/src/lr/kernelLinearRegresion.cu.s
 .PHONY : src/lr/kernelLinearRegresion.cu.s
 
 src/main.o: src/main.cu.o
@@ -234,6 +284,11 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... amd_ml"
+	@echo "... amd_ml_core"
+	@echo "... amd_ml_py"
+	@echo "... bindings/amd_ml_bindings.o"
+	@echo "... bindings/amd_ml_bindings.i"
+	@echo "... bindings/amd_ml_bindings.s"
 	@echo "... src/amdMemoryManagement.o"
 	@echo "... src/amdMemoryManagement.i"
 	@echo "... src/amdMemoryManagement.s"

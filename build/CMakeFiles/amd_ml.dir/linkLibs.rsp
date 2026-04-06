@@ -1,1 +1,1 @@
- -lcuda -lcudadevrt -lcudart_static -lrt -lpthread -ldl 
+ -Wl,-rpath,/home/adrian/prueba/amd_ml/build libamd_ml_core.so -lcuda -lcudadevrt -lcudart_static -lrt -lpthread -ldl 

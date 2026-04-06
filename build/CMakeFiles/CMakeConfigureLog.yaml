@@ -832,3 +832,45 @@ events:
       
       
 ...
+
+---
+events:
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/usr/share/cmake-3.28/Modules/Internal/CheckSourceCompiles.cmake:101 (try_compile)"
+      - "/usr/share/cmake-3.28/Modules/Internal/CheckCompilerFlag.cmake:18 (cmake_check_source_compiles)"
+      - "/usr/share/cmake-3.28/Modules/CheckCXXCompilerFlag.cmake:34 (cmake_check_compiler_flag)"
+      - "/usr/lib/cmake/pybind11/pybind11Common.cmake:276 (check_cxx_compiler_flag)"
+      - "/usr/lib/cmake/pybind11/pybind11Common.cmake:318 (_pybind11_return_if_cxx_and_linker_flags_work)"
+      - "/usr/lib/cmake/pybind11/pybind11Common.cmake:385 (_pybind11_generate_lto)"
+      - "/usr/lib/cmake/pybind11/pybind11Config.cmake:250 (include)"
+      - "CMakeLists.txt:31 (find_package)"
+    checks:
+      - "Performing Test HAS_FLTO"
+    directories:
+      source: "/home/adrian/prueba/amd_ml/build/CMakeFiles/CMakeScratch/TryCompile-NjX2AH"
+      binary: "/home/adrian/prueba/amd_ml/build/CMakeFiles/CMakeScratch/TryCompile-NjX2AH"
+    cmakeVariables:
+      CMAKE_CUDA_ARCHITECTURES: "native"
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_CXX_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+    buildResult:
+      variable: "HAS_FLTO"
+      cached: true
+      stdout: |
+        Change Dir: '/home/adrian/prueba/amd_ml/build/CMakeFiles/CMakeScratch/TryCompile-NjX2AH'
+        
+        Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_e77d9/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_e77d9.dir/build.make CMakeFiles/cmTC_e77d9.dir/build
+        gmake[1]: Entering directory '/home/adrian/prueba/amd_ml/build/CMakeFiles/CMakeScratch/TryCompile-NjX2AH'
+        Building CXX object CMakeFiles/cmTC_e77d9.dir/src.cxx.o
+        /usr/bin/g++ -DHAS_FLTO  -std=gnu++17   -flto -fno-fat-lto-objects -o CMakeFiles/cmTC_e77d9.dir/src.cxx.o -c /home/adrian/prueba/amd_ml/build/CMakeFiles/CMakeScratch/TryCompile-NjX2AH/src.cxx
+        Linking CXX executable cmTC_e77d9
+        /usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_e77d9.dir/link.txt --verbose=1
+        /usr/bin/g++ CMakeFiles/cmTC_e77d9.dir/src.cxx.o -o cmTC_e77d9  -flto 
+        gmake[1]: Leaving directory '/home/adrian/prueba/amd_ml/build/CMakeFiles/CMakeScratch/TryCompile-NjX2AH'
+        
+      exitCode: 0
+...
