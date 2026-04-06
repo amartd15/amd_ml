@@ -141,6 +141,8 @@ __host__ void freeTensor(tensor* data, bias decision){
 
     }
 
+    //If we are taking pointers of python, we dont have to get rid of the host memory
+
     // if(decision == NO_BIAS){
     //     free(data->data_h);
 

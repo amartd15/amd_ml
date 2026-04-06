@@ -15,7 +15,7 @@ for i in range(n_puntos):
     X[i, 1] = i / n_puntos
     y[i] = 3.0 * X[i, 1] + 2.0 * X[i, 0]
 
-params = amd_ml_py.linear_regression(
+params: np.ndarray = amd_ml_py.linear_regression(
     X, y,
     n_iter=1000,
     tolerance=0.01,
