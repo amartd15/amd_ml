@@ -1,1 +1,0 @@
-/usr/bin/g++ @CMakeFiles/amd_ml.dir/objects1.rsp -o amd_ml @CMakeFiles/amd_ml.dir/linkLibs.rsp -L"/usr/local/cuda-12.5/targets/x86_64-linux/lib/stubs" -L"/usr/local/cuda-12.5/targets/x86_64-linux/lib"

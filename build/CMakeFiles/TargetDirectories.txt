@@ -1,5 +1,0 @@
-/home/adrian/prueba/amd_ml/build/CMakeFiles/amd_ml_core.dir
-/home/adrian/prueba/amd_ml/build/CMakeFiles/amd_ml.dir
-/home/adrian/prueba/amd_ml/build/CMakeFiles/amd_ml_py.dir
-/home/adrian/prueba/amd_ml/build/CMakeFiles/edit_cache.dir
-/home/adrian/prueba/amd_ml/build/CMakeFiles/rebuild_cache.dir
