@@ -1,11 +1,15 @@
 import sys
-sys.path.append("build")  # para que Python encuentre el .so
+from pathlib import Path
 
-import amd_ml_py
+#build = Path(__file__).resolve().parent.parent / "build"
+
+sys.path.append('./build')  # para que Python encuentre el .so
+
+from amd_ml_py import SGD_linear_regression
 
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import SGDRegressor
 
 from timeit import time
 
@@ -33,11 +37,11 @@ def create_matrix(n_points: int, n_dimentions: int) -> list[np.ndarray]:
 
 def comparation(X: np.ndarray, y: np.ndarray, terms: np.ndarray, print_data = True) -> list[float]:
     a = time.time()
-    parameters_sk = LinearRegression(fit_intercept=False).fit(X, y)
+    parameters_sk = SGDRegressor(fit_intercept=False).fit(X, y.ravel())
     b = time.time()
 
     c = time.time()
-    params: np.ndarray = amd_ml_py.linear_regression(
+    params: np.ndarray = SGD_linear_regression(
         X, y,
         n_iter=1000,
         tolerance=0.01,
@@ -49,7 +53,7 @@ def comparation(X: np.ndarray, y: np.ndarray, terms: np.ndarray, print_data = Tr
     time_sk = b-a
 
     if print_data:
-        print(f"Parámetros encontrados: {params.round(1)}, tiempo usado: {time_amd} milisegundos")
+        print(f"\nParámetros encontrados: {params.round(1)}, tiempo usado: {time_amd} milisegundos")
         print(f"Parámetros encontrados sklearn: {parameters_sk.coef_.round(1)}, tiempo usado: {time_sk} milisegundos")
         print(f"Esperado: {terms}")
 
@@ -99,7 +103,7 @@ def comparation_amd_sk(n_points: int, n_dim: int) -> None:
     plt.show()
 
 def main() -> None:
-    comparation_amd_sk(7, 20)
+    comparation(*create_matrix(1000, 3))
 
 if __name__ == "__main__":
     main()

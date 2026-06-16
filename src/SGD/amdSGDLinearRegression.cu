@@ -1,8 +1,8 @@
-#include "lr/kernelLinearRegresion.h"
-#include "lr/amdLinearRegression.h"
+#include "SGD/kernelSGDLinearRegresion.h"
+#include "SGD/amdSGDLinearRegression.h"
 
-extern "C" {
-__host__ amd_linear_regression linear_regression(
+extern "C"{
+__host__ amd_linear_regression SGD_linear_regression(
     float* point_matrix, float* result_matrix,
     int n_points, int n_parameters, int n_iter,
     float desired_tolerance, float initial_seed, float learning_rate,
@@ -15,11 +15,11 @@ __host__ amd_linear_regression linear_regression(
     tensor* matrix_result = createTensor(result_matrix, n_points, 1);
     tensor* parameters = createTensor(initial_seed, n_parameters, 1);
     tensor* error = createTensor(n_points, 1);
-    tensor* gradient = createTensor(n_parameters, 1);
+    tensor* gradient = createTensor(1, 1);
 
     float mse = 0.0f;
 
-    linearRregresionKernel(
+    SGDlinearRregresionKernel(
         matrix_points, matrix_result, parameters, gradient, error,
         n_parameters, n_points, n_iter, 
         learning_rate, desired_tolerance, mse
