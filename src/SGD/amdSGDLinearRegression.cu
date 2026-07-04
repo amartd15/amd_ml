@@ -1,7 +1,14 @@
 #include "SGD/kernelSGDLinearRegresion.h"
 #include "SGD/amdSGDLinearRegression.h"
 
+#ifdef __cplusplus
 extern "C"{
+#endif
+
+// This function performs a classical stocastic gradent descent on a couple of points and 
+// return a context with all variables available
+// It has the ability to add a bias (independent term) to the data set if needed
+// The context shall be cleared with cleanContext()
 __host__ amd_linear_regression SGD_linear_regression(
     float* point_matrix, float* result_matrix,
     int n_points, int n_parameters, int n_iter,
@@ -17,6 +24,7 @@ __host__ amd_linear_regression SGD_linear_regression(
     tensor* error = createTensor(n_points, 1);
     tensor* gradient = createTensor(1, 1);
 
+    //We call the real function
     SGDlinearRregresionKernel(
         matrix_points, matrix_result, parameters, gradient, error,
         n_parameters, n_points, n_iter, 
@@ -35,6 +43,10 @@ __host__ amd_linear_regression SGD_linear_regression(
     context.decision = decision;
     context.mse = SGD_calculateNorm(error);
 
+    //We return all the calculated data in a structure
     return context;
 }
+
+#ifdef __cplusplus
 }
+#endif

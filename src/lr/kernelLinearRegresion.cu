@@ -1,7 +1,15 @@
 #include "lr/kernelLinearRegresion.h"
 #include "amdMemoryManagement.h"
 
-//Performs the calculation of the gradent, as well as clearing the gradient and error matrix
+//Some hiperparameters
+#define ITERATION_CHECK_N 10
+#define LEARNING_RATE_REDUCTION 0.1f
+#define MINIMUM_LEARNING_RATE 1e-10f
+
+
+//-------------------------------------------------- GRADENT DESCENT -------------------------------------------//
+
+//Performs the calculation of the gradent in GPU
 __global__ void lr_gradientDescent(
     const float* d_X, const float* d_y, 
     float* param, float* grad, float* error,
@@ -33,6 +41,7 @@ __global__ void lr_gradientDescent(
 
         __syncthreads();
 
+        //An algorithm to add all the elemtns of an array
         for(int j = blockDim.x / 2; j > 0; j >>= 1){
             if(tdx < j){
                 buffer[tdx] += buffer[tdx + j];
@@ -41,19 +50,22 @@ __global__ void lr_gradientDescent(
             __syncthreads();
         }
 
+        //We add all the results from each block
         if(tdx == 0) {atomicAdd(&grad[k], buffer[0]); }
 
     }
 
 }
 
-//Update the parameters matrix
+
+//Update the parameters matrix in GPU
 __global__ void lr_updateParameters(
     float* parameters, float* gradent, 
     float alpha, int n_points, int n_param
 ){
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     
+    //Updates the parameters, with alpha/n_points as pseudo learning rate
     if(idx < n_param){
         parameters[idx] -= gradent[idx] * alpha / n_points; 
     }
@@ -61,38 +73,33 @@ __global__ void lr_updateParameters(
 
 
 //This function encapsulates the process of launching the kernel of the linear regression.
-//Only brings back to host memory the parameters matrix
+//Only brings back to host memory the parameters matrix, the rest is kept in device memory
 __host__ void linearRregresionKernel(
     tensor* X, tensor* y, tensor* parameters, tensor* gradient, tensor* error,
     int n_param, int n_points, int n_iter, 
     float learning_rate, float desired_tol
 ){
 
-    dim3 numThreads, numBlocks, numThreadsParameters;
-
-    //After some benchmarks the best result is given with 128 - 256 threads per block
-    numThreads.x = 128;
-    numThreads.y = 1;
-    numThreads.z = 1;
-
     //We check wether there are more parameters or points in the dataset
     int length = (n_param < n_points) ? n_points : n_param;
-    
-    numBlocks.x = (int) (length + numThreads.x - 1) / numThreads.x;
-    numBlocks.y = 1;
-    numBlocks.z = 1;
 
-    numThreadsParameters.x = n_param;
-    numThreadsParameters.y = 1;
-    numThreadsParameters.z = 1;
+    //We define the variables needed for launching the kernel
+    dim3 numThreads, numBlocks, numThreadsParameters;
 
+    numThreads = {128, 1, 1}; //After some benchmarks the best result is given with 128 - 256 threads per block
+    numBlocks = {(int) (length + numThreads.x - 1) / numThreads.x, 1, 1};
+
+    numThreadsParameters = {n_param, 1, 1};
+
+    //We define the shared memory we will be using
     int shared_mem = numThreads.x * sizeof(float);
 
     int iter = 0;
-    tensor* mse = createTensor(0.0f, 1, 1);
+    tensor* mse = createTensor(0.0f, 1, 1); //For tracking if the model bounces back
 
     //The main loop of the algorithm
     do{
+        //Reset the gradent
         cudaMemsetAsync(gradient->data_d, 0, n_param * sizeof(float));
 
         lr_gradientDescent <<<numBlocks, numThreads, shared_mem>>>(
@@ -113,37 +120,50 @@ __host__ void linearRregresionKernel(
 
     cudaDeviceSynchronize();
 
+    //We check for silent errors
+    cudaError_t err = cudaGetLastError();
+    if(err != cudaSuccess){
+        std::cout << "Error during the kernel launch. Error message -> " << cudaGetErrorString(err) << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
     //We bring back only the parameters
     copyMemory(parameters, DEVICE_TO_HOST);
 
-    //We free the pointer
+    //We free the pointer used for tracking the mse
     freeTensor(mse);
 }
 
 
-//Every 10 iterations we check if the tolerance is met
+//-------------------------------------------------- CHECK TOLERANCES -------------------------------------------//
+
+//Every ITERATION_CHECK_N iterations we check if the tolerance is met, if we detect a bounce back
+//We reduce by LEARNING_RATE_REDUCTION the learning rate, until it reches MINIMUM_LEARNING_RATE
 __host__ bool lr_checkError(int iter, float desired_tol, tensor* mse, float* alpha, tensor* error){
     
-    if(iter % 10 == 0){
+    if(iter % ITERATION_CHECK_N == 0){
 
         //We use an auxiliary variable to compare with the value of the previous iteration so that
         //we can catch when the gradent "bounces" back
 
         float mse_aux = lr_calculateNorm(error);
 
+        //If we detect a bounce back, we modify the learning rate
         if (
             (*mse->data_h < mse_aux) &&
-            (iter != 10) //For not reducing the learning rate at the beggining
+            (iter != ITERATION_CHECK_N) //For not reducing the learning rate at the beggining
         ){
-            *alpha = 0.1 * *alpha;
+            *alpha *= LEARNING_RATE_REDUCTION; //Reduce the learning rate
 
-            if(*alpha <= 1e-10) {return false;}
+            if(*alpha <= MINIMUM_LEARNING_RATE) {return false;}
 
             std::cout << "Se ha cambiado la tasa de aprendizaje en la " << iter << " iteracion. Alpha = "<< *alpha << std::endl;
         }
 
+        //We swap the values
         *mse->data_h = mse_aux;
 
+        //We check if the tolerance is met
         if(*mse->data_h <= desired_tol){
             std::cout << "Se ha alcanzado la tolerancia esperada a las " << iter << " iteraciones\n" << std::endl;
             return false;
@@ -157,57 +177,72 @@ __host__ bool lr_checkError(int iter, float desired_tol, tensor* mse, float* alp
 }
 
 
-//A first approach to calculate the euclidean norm of a vector in CPU
+//Encapsulates the launch of a kernel that calculates the euclidean norm of an horizontal or vertical vector
 __host__ float lr_calculateNorm(tensor* vector){
 
+    //An auxiliary variable initalized with 0 values
     tensor* mse_squared = createTensor(0.0f, 1, 1);
 
     int size;
 
-    //We calculate wether the vecotr is a row or a column
+    //We calculate wether the vector is a row or a column
     if(min(vector->rows, vector->columns) == 1){
         size = max(vector->rows, vector->columns);
     }else{
         std::cout << "Error, trying to calculate the norm of a matrix" << std::endl;
     }
 
+    //Some parameters to launch the kernel
     dim3 numThreads = {128, 1, 1};
-    dim3 numBlocks  = {
-        (int) (size + numThreads.x -1) / numThreads.x,
-        1,
-        1
-    };
+    dim3 numBlocks  = {(int) (size + numThreads.x -1) / numThreads.x, 1, 1};
 
+    //Shared memory
     int sharedMem = numThreads.x * sizeof(float);
 
+    //We launch the kernel
     lr_norm<<<numBlocks, numThreads, sharedMem>>>(vector->data_d, mse_squared->data_d, size);
-    copyMemory(mse_squared, DEVICE_TO_HOST);
 
+    //We check for silent errors during the kernel launch
+    cudaError_t err = cudaGetLastError();
+    if(err != cudaSuccess){
+        std::cout << "Error launching the kernel" << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
+    //Bring back the mse squared to host memory and storeing it on a variable
+    copyMemory(mse_squared, DEVICE_TO_HOST);
     float value = *mse_squared->data_h;
 
+    //To avoid memory leaks (on each iteration allocate memory and not cleaning it)
     freeTensor(mse_squared);
 
     return sqrt(value);
 }
 
+
+//Performs the euclidean norm of a vactor in GPU
 __global__ void lr_norm(float* data, float* value, int size){
     
     extern __shared__ float buffer[];
+
     int idx = threadIdx.x + blockDim.x * blockIdx.x;
     int tdx = threadIdx.x;
 
-        buffer[tdx] = (idx < size) ? data[idx] * data[idx] : 0.0f;
+    //We fill the shared memory with each element of the error squared
+    buffer[tdx] = (idx < size) ? data[idx] * data[idx] : 0.0f;
 
-        __syncthreads();
+    __syncthreads();
 
-        for(int j = blockDim.x / 2; j > 0; j >>= 1){
-            if(tdx < j){
-                buffer[tdx] += buffer[tdx + j];
-            }
-
-            __syncthreads();
+    //An algorithm to add all the elements of a vector
+    for(int j = blockDim.x / 2; j > 0; j >>= 1){
+        if(tdx < j){
+            buffer[tdx] += buffer[tdx + j];
         }
 
-        if(tdx == 0) {atomicAdd(value, buffer[0]);}
+        __syncthreads();
+    }
+
+    //We add the result of each block into a variable
+    if(tdx == 0) {atomicAdd(value, buffer[0]);}
 
 }

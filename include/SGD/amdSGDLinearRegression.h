@@ -6,13 +6,15 @@
 #include "amdMemoryManagement.h"
 #include "kernelSGDLinearRegresion.h"
 
-//Performs a gradient descent algorithm and returns a context with all the
-//variables. The context shall be cleared with cleanContext()
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+// This function performs a classical stocastic gradent descent on a couple of points and 
+// return a context with all variables available
+// It has the ability to add a bias (independent term) to the data set if needed
+// The context shall be cleared with cleanContext()
 __host__ amd_linear_regression SGD_linear_regression(
     float* point_matrix, float* result_matrix,
     int n_points, int n_parameters, int n_iter,

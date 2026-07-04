@@ -1,30 +1,15 @@
 #include "SGD/kernelSGDLinearRegresion.h"
 #include "amdMemoryManagement.h"
 
-__global__ void SGD_calculateError(
-    const float* d_X,
-    const float* d_y,
-    const float* param,
-    float* error,
-    int n_points, int n_param
-){
-    int idx = threadIdx.x + blockDim.x * blockIdx.x;
+//Some hiperparameters
+#define ITERATION_CHECK_N 10
+#define LEARNING_RATE_REDUCTION 0.1f
+#define MINIMUM_LEARNING_RATE 1e-10f
 
-    //We create the function and calculate the error for each point
-    if(idx < n_points){
 
-        float h = 0.0f;
+//-------------------------------------------------- GRADENT DESCENT -------------------------------------------//
 
-        for(int k = 0; k < n_param; ++k){
-            h += d_X[idx * n_param + k] * param[k];
-        }
-
-        error[idx] =  h - d_y[idx];
-
-    }    
-}
-
-//Performs the calculation of the gradent, as well as clearing the gradient and error matrix
+//Performs the calculation of the SGD in GPU
 __global__ void StocasticGradientDescent(
     const float* d_X, 
     const float* d_y, 
@@ -58,8 +43,8 @@ __global__ void StocasticGradientDescent(
 }
 
 
-//This function encapsulates the process of launching the kernel of the linear regression.
-//Only brings back to host memory the parameters matrix
+//This function encapsulates the process of launching the kernel of the SGD linear regression.
+//Only brings back to host memory the parameters matrix, the rest is kept in device memory
 __host__ void SGDlinearRregresionKernel(
     tensor* X, tensor* y, tensor* parameters, tensor* gradient, tensor* error,
     int n_param, int n_points, int n_iter, 
@@ -119,29 +104,61 @@ __host__ void SGDlinearRregresionKernel(
 }
 
 
-//Every 10 iterations we check if the tolerance is met
+//-------------------------------------------------- CHECK TOLERANCES -------------------------------------------//
+
+
+//We calculate the error with our current model with the dataset
+__global__ void SGD_calculateError(
+    const float* d_X,
+    const float* d_y,
+    const float* param,
+    float* error,
+    int n_points, int n_param
+){
+    int idx = threadIdx.x + blockDim.x * blockIdx.x;
+
+    //We create the function and calculate the error for each point
+    if(idx < n_points){
+
+        float h = 0.0f;
+
+        for(int k = 0; k < n_param; ++k){
+            h += d_X[idx * n_param + k] * param[k];
+        }
+
+        error[idx] =  h - d_y[idx];
+
+    }    
+}
+
+
+//Every ITERATION_CHECK_N iterations we check if the tolerance is met, if we detect a bounce back
+//We reduce by LEARNING_RATE_REDUCTION the learning rate, until it reches MINIMUM_LEARNING_RATE
 __host__ bool SGD_checkError(int iter, float desired_tol, tensor* mse, float* alpha, tensor* error){
     
-    if(iter % 10 == 0){
+    if(iter % ITERATION_CHECK_N == 0){
 
         //We use an auxiliary variable to compare with the value of the previous iteration so that
         //we can catch when the gradent "bounces" back
 
         float mse_aux = SGD_calculateNorm(error);
 
+        //If we detect a bounce back, we modify the learning rate
         if (
             (*mse->data_h < mse_aux) &&
-            (iter != 10) //For not reducing the learning rate at the beggining
+            (iter != ITERATION_CHECK_N) //For not reducing the learning rate at the beggining
         ){
-            *alpha = 0.1 * *alpha;
+            *alpha *= LEARNING_RATE_REDUCTION; //Reduce the learning rate
 
-            if(*alpha <= 1e-10) {return false;}
+            if(*alpha <= MINIMUM_LEARNING_RATE) {return false;}
 
             std::cout << "Se ha cambiado la tasa de aprendizaje en la " << iter << " iteracion. Alpha = "<< *alpha << std::endl;
         }
 
+        //We swap the values
         *mse->data_h = mse_aux;
 
+        //We check if the tolerance is met
         if(*mse->data_h <= desired_tol){
             std::cout << "Se ha alcanzado la tolerancia esperada a las " << iter << " iteraciones\n" << std::endl;
             return false;
@@ -155,7 +172,7 @@ __host__ bool SGD_checkError(int iter, float desired_tol, tensor* mse, float* al
 }
 
 
-//A first approach to calculate the euclidean norm of a vector in CPU
+//Encapsulates the launch of a kernel that calculates the euclidean norm of an horizontal or vertical vector
 __host__ float SGD_calculateNorm(tensor* vector){
 
     tensor* mse_squared = createTensor(0.0f, 1, 1);
@@ -188,6 +205,8 @@ __host__ float SGD_calculateNorm(tensor* vector){
     return sqrt(value);
 }
 
+
+//Performs the euclidean norm of a vactor in GPU
 __global__ void SGD_norm(float* data, float* value, int size){
     
     extern __shared__ float buffer[];

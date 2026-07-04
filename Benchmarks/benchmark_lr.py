@@ -57,7 +57,7 @@ def comparation(X: np.ndarray, y: np.ndarray, terms: np.ndarray, print_data = Tr
     params: np.ndarray = linear_regression(
         X, y,
         n_iter=1000,
-        tolerance=0.01 * len(X),
+        tolerance=0.001,
         learning_rate=0.1
     )
     d = time.time()
@@ -66,8 +66,8 @@ def comparation(X: np.ndarray, y: np.ndarray, terms: np.ndarray, print_data = Tr
     time_sk = b-a
 
     if print_data:
-        print(f"Parámetros encontrados: {params.round(1)}, tiempo usado: {time_amd} milisegundos")
-        print(f"Parámetros encontrados sklearn: {parameters_sk.coef_.round(1)}, tiempo usado: {time_sk} milisegundos")
+        print(f"Parámetros encontrados: {params.round(1)}, tiempo usado: {time_amd * 1000:.2f} milisegundos")
+        print(f"Parámetros encontrados sklearn: {parameters_sk.coef_.round(1)}, tiempo usado: {time_sk * 1000:.2f} milisegundos")
         print(f"Esperado: {terms}")
 
     return [time_amd, time_sk]    

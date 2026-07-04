@@ -12,6 +12,7 @@ struct tensor{
     int rows;
 };
 
+// For dealing fith bias or not
 enum bias{
     NO_BIAS,
     YES_BIAS
@@ -29,6 +30,7 @@ struct amd_linear_regression{
     float mse;
 };
 
+// Used in functions to handle memory, specifies the direcction of the data transfer
 enum direction{
     HOST_TO_DEVICE,
     DEVICE_TO_HOST
