@@ -1,6 +1,7 @@
 #include "amdMemoryManagement.h"
 
 
+//Creates an empty tensor with allocated Pinned and Device memory
 __host__ tensor* createTensor(int rows, int cols){
     tensor* created_tensor = (tensor*)malloc(sizeof(tensor));
 
@@ -16,6 +17,7 @@ __host__ tensor* createTensor(int rows, int cols){
 };
 
 
+//Creates a tensor with the given data both in device and host memory
 __host__ tensor* createTensor(float* data, int rows, int cols){
     tensor* created_tensor = (tensor*)malloc(sizeof(tensor));
 
@@ -33,6 +35,7 @@ __host__ tensor* createTensor(float* data, int rows, int cols){
 };
 
 
+//Creates a tensor with the given seed both in device and host memory
 __host__ tensor* createTensor(float seed, int rows, int cols){
     tensor* created_tensor = (tensor*)malloc(sizeof(tensor));
 
@@ -56,6 +59,28 @@ __host__ tensor* createTensor(float seed, int rows, int cols){
 };
 
 
+//Create a unique pointer to a variable in GPU
+template <typename T>
+__host__ T* createPointer(T data){
+    T* data_ptr = (T*)malloc(sizeof(T));
+    cudaError_t err;
+
+    err = cudaMalloc((void**) data_ptr, sizeof(T));
+    if(err != cudaSuccess){
+        std::cout << "Error guardando memoria. Codigo de error-> " << cudaGetErrorString(err) << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
+    err = cudaMemcpy((void*) data_ptr, (void*) &data, sizeof(T), cudaMemcpyDeviceToHost);
+    if(err != cudaSuccess){
+        std::cout << "Error copiando memoria. Codigo de error-> " << cudaGetErrorString(err) << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
+    return data_ptr;
+}
+
+//Allocates memory in RAM
 __host__ float* allocatePinnedMemory(size_t size){
     cudaError_t err;
     float* ptr;
@@ -71,6 +96,7 @@ __host__ float* allocatePinnedMemory(size_t size){
 };
 
 
+//Allocates mamory in VRAM (GPU)
 __host__ float* allocateDeviceMemory(size_t size){
     cudaError_t err;
     float* ptr;
@@ -86,6 +112,7 @@ __host__ float* allocateDeviceMemory(size_t size){
 };
 
 
+//Copy memory in any given direction between RAM and VRAM
 __host__ void copyMemory(tensor* data, direction direction){
     cudaError_t err;
     size_t size = data->rows * data->columns * sizeof(float);
@@ -110,6 +137,7 @@ __host__ void copyMemory(tensor* data, direction direction){
 };
 
 
+//Free memory from both RAM and VRAM
 __host__ void freeTensor(tensor* data){
     cudaError_t err;
 
@@ -131,6 +159,7 @@ __host__ void freeTensor(tensor* data){
 };
 
 
+//Free memory only from device, and free the structure
 __host__ void freeTensor(tensor* data, bias decision){
     cudaError_t err;
 
@@ -159,6 +188,7 @@ __host__ void freeTensor(tensor* data, bias decision){
 };
 
 
+//In case of the points matrix, we preparate the tensor wether we want bias or not
 __host__ tensor* preparePointsTenstor(float* point_matrix, int n_parameters, int n_points, bias decision){
 
     //We prepare the tensor for the points matrix
@@ -191,6 +221,7 @@ __host__ tensor* preparePointsTenstor(float* point_matrix, int n_parameters, int
 }
 
 
+//We clean up all the variables created in the program
 __host__ void cleanContext(amd_linear_regression context){
     freeTensor(context.error);
     freeTensor(context.parameters);
@@ -200,6 +231,7 @@ __host__ void cleanContext(amd_linear_regression context){
 }
 
 
+//Good practice to clean up the device
 __host__ void cleanUpDevice(){
     cudaError_t err = cudaDeviceReset();
     if (err != cudaSuccess){

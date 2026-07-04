@@ -17,12 +17,10 @@ __host__ amd_linear_regression SGD_linear_regression(
     tensor* error = createTensor(n_points, 1);
     tensor* gradient = createTensor(1, 1);
 
-    float mse = 0.0f;
-
     SGDlinearRregresionKernel(
         matrix_points, matrix_result, parameters, gradient, error,
         n_parameters, n_points, n_iter, 
-        learning_rate, desired_tolerance, mse
+        learning_rate, desired_tolerance
     );
 
     //We create and fill the structure of the function

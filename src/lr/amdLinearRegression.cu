@@ -1,7 +1,10 @@
 #include "lr/kernelLinearRegresion.h"
 #include "lr/amdLinearRegression.h"
 
+#ifdef __cplusplus
 extern "C" {
+#endif
+
 __host__ amd_linear_regression linear_regression(
     float* point_matrix, float* result_matrix,
     int n_points, int n_parameters, int n_iter,
@@ -17,12 +20,10 @@ __host__ amd_linear_regression linear_regression(
     tensor* error = createTensor(n_points, 1);
     tensor* gradient = createTensor(n_parameters, 1);
 
-    float mse = 0.0f;
-
     linearRregresionKernel(
         matrix_points, matrix_result, parameters, gradient, error,
         n_parameters, n_points, n_iter, 
-        learning_rate, desired_tolerance, mse
+        learning_rate, desired_tolerance
     );
 
     //We create and fill the structure of the function
@@ -39,4 +40,7 @@ __host__ amd_linear_regression linear_regression(
 
     return context;
 }
+
+#ifdef __cplusplus
 }
+#endif

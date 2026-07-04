@@ -1,17 +1,29 @@
 import sys
+
 from pathlib import Path
-
-#build = Path(__file__).resolve().parent.parent / "build"
-
-sys.path.append('./build')  # para que Python encuentre el .so
-
-from amd_ml_py import SGD_linear_regression
-
-import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.linear_model import SGDRegressor
-
 from timeit import time
+
+#Tratamos de importar la librería con la que trabajamos
+try:
+    build = Path(__file__).resolve().parent.parent / "build" #Teniendo en cuenta que se ejecuta desde la carpeta base del proyecto
+    print("\nBuscando librerias en -> ", build)
+
+    sys.path.append(str(build))  # para que Python encuentre el .so
+
+    from amd_ml_py import SGD_linear_regression
+except:
+    print("No se pudo enlazar con la libreria externa")
+    exit()
+
+#Importamos los otros paquetes, asegurándonos que el entorno virtual está activado
+try:
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from sklearn.linear_model import SGDRegressor
+except ModuleNotFoundError:
+    print("No se activo debidamente el entorno virtual o hay un problema con las librerias externas")
+    exit()
+
 
 def create_matrix(n_points: int, n_dimentions: int) -> list[np.ndarray]:
     #We generate a linear regression with coefficients 1, 2, 3, ...
@@ -42,7 +54,7 @@ def comparation(X: np.ndarray, y: np.ndarray, terms: np.ndarray, print_data = Tr
 
     c = time.time()
     params: np.ndarray = SGD_linear_regression(
-        X, y,
+        X, y.ravel(),
         n_iter=1000,
         tolerance=0.01,
         learning_rate=0.1
@@ -53,8 +65,8 @@ def comparation(X: np.ndarray, y: np.ndarray, terms: np.ndarray, print_data = Tr
     time_sk = b-a
 
     if print_data:
-        print(f"\nParámetros encontrados: {params.round(1)}, tiempo usado: {time_amd} milisegundos")
-        print(f"Parámetros encontrados sklearn: {parameters_sk.coef_.round(1)}, tiempo usado: {time_sk} milisegundos")
+        print(f"\nParámetros encontrados: {params.round(1)}, tiempo usado: {time_amd:.4f} milisegundos")
+        print(f"Parámetros encontrados sklearn: {parameters_sk.coef_.round(1)}, tiempo usado: {time_sk:.4f} milisegundos")
         print(f"Esperado: {terms}")
 
     return [time_amd, time_sk]    
@@ -103,7 +115,7 @@ def comparation_amd_sk(n_points: int, n_dim: int) -> None:
     plt.show()
 
 def main() -> None:
-    comparation(*create_matrix(1000, 3))
+    comparation_amd_sk(5, 2)
 
 if __name__ == "__main__":
     main()

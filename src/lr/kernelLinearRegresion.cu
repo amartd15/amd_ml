@@ -14,8 +14,6 @@ __global__ void gradientDescent(
     extern __shared__ float buffer[];
 
     //We reset the gradent and the error
-    if(idx < n_points) { error[idx] = 0.0f; }
-
     if(idx < n_param) { grad[idx] = 0.0f; }
 
     //We create the function and calculate the error for each point
@@ -35,7 +33,6 @@ __global__ void gradientDescent(
     #pragma unroll
     for(int k = 0; k < n_param; ++k){
         buffer[tdx] = (idx < n_points) ? 2 * error[idx] * d_X[idx * n_param + k] : 0.0f;
-        //buffer[tdx] = 2 * error[idx] * d_X[idx * n_param + k];
 
         __syncthreads();
 
@@ -71,7 +68,7 @@ __global__ void updateParameters(
 __host__ void linearRregresionKernel(
     tensor* X, tensor* y, tensor* parameters, tensor* gradient, tensor* error,
     int n_param, int n_points, int n_iter, 
-    float learning_rate, float desired_tol, float mse
+    float learning_rate, float desired_tol
 ){
 
     dim3 numThreads, numBlocks, numThreadsParameters;
@@ -95,9 +92,12 @@ __host__ void linearRregresionKernel(
     int shared_mem = numThreads.x * sizeof(float);
 
     int iter = 0;
+    tensor* mse = createTensor(0.0f, 1, 1);
 
     //The main loop of the algorithm
     do{
+        //cudaMemsetAsync(gradient->data_d, 0, n_param * sizeof(float));
+
         gradientDescent <<<numBlocks, numThreads, shared_mem>>>(
             X->data_d, y->data_d,
             parameters->data_d, gradient->data_d, error->data_d,
@@ -111,39 +111,43 @@ __host__ void linearRregresionKernel(
 
     }while(
         (++iter < n_iter) &&
-        (checkError(iter, desired_tol, &mse, &learning_rate, error))    
+        (checkError(iter, desired_tol, mse, &learning_rate, error))    
     );
 
     cudaDeviceSynchronize();
 
     //We bring back only the parameters
     copyMemory(parameters, DEVICE_TO_HOST);
+
+    //We free the pointer
+    freeTensor(mse);
 }
 
 
 //Every 10 iterations we check if the tolerance is met
-__host__ bool checkError(int iter, float desired_tol, float* mse, float* learning_rate, tensor* error){
+__host__ bool checkError(int iter, float desired_tol, tensor* mse, float* alpha, tensor* error){
     
     if(iter % 10 == 0){
 
         //We use an auxiliary variable to compare with the value of the previous iteration so that
         //we can catch when the gradent "bounces" back
+
         float mse_aux = calculateNorm(error);
 
         if (
-            (*mse < mse_aux) &&
+            (*mse->data_h < mse_aux) &&
             (iter != 10) //For not reducing the learning rate at the beggining
         ){
-            *learning_rate = 0.1 * *learning_rate;
+            *alpha = 0.1 * *alpha;
 
-            if(*learning_rate <= 1e-10) {return false;}
+            if(*alpha <= 1e-10) {return false;}
 
-            std::cout << "Se ha cambiado la tasa de aprendizaje en la " << iter << " iteracion. Alpha = "<< *learning_rate << std::endl;
+            std::cout << "Se ha cambiado la tasa de aprendizaje en la " << iter << " iteracion. Alpha = "<< *alpha << std::endl;
         }
 
-        *mse = mse_aux;
+        *mse->data_h = mse_aux;
 
-        if(*mse <= desired_tol){
+        if(*mse->data_h <= desired_tol){
             std::cout << "Se ha alcanzado la tolerancia esperada a las " << iter << " iteraciones\n" << std::endl;
             return false;
         }
@@ -158,14 +162,55 @@ __host__ bool checkError(int iter, float desired_tol, float* mse, float* learnin
 
 //A first approach to calculate the euclidean norm of a vector in CPU
 __host__ float calculateNorm(tensor* vector){
-    float norm = 0.0f;
 
-    cudaDeviceSynchronize();
-    copyMemory(vector, DEVICE_TO_HOST);
+    tensor* mse_squared = createTensor(0.0f, 1, 1);
 
-    for(int i = 0; i < vector->rows; ++i){
-        norm += vector->data_h[i] * vector->data_h[i];
+    int size;
+
+    //We calculate wether the vecotr is a row or a column
+    if(min(vector->rows, vector->columns) == 1){
+        size = max(vector->rows, vector->columns);
+    }else{
+        std::cout << "Error, trying to calculate the norm of a matrix" << std::endl;
     }
 
-    return norm;
+    dim3 numThreads = {128, 1, 1};
+    dim3 numBlocks  = {
+        (int) (size + numThreads.x -1) / numThreads.x,
+        1,
+        1
+    };
+
+    int sharedMem = numThreads.x * sizeof(float);
+
+    norm<<<numBlocks, numThreads, sharedMem>>>(vector->data_d, mse_squared->data_d, size);
+    copyMemory(mse_squared, DEVICE_TO_HOST);
+
+    float value = *mse_squared->data_h;
+
+    freeTensor(mse_squared);
+
+    return sqrt(value);
+}
+
+__global__ void norm(float* data, float* value, int size){
+    
+    extern __shared__ float buffer[];
+    int idx = threadIdx.x + blockDim.x * blockIdx.x;
+    int tdx = threadIdx.x;
+
+        buffer[tdx] = (idx < size) ? data[idx] * data[idx] : 0.0f;
+
+        __syncthreads();
+
+        for(int j = blockDim.x / 2; j > 0; j >>= 1){
+            if(tdx < j){
+                buffer[tdx] += buffer[tdx + j];
+            }
+
+            __syncthreads();
+        }
+
+        if(tdx == 0) {atomicAdd(value, buffer[0]);}
+
 }

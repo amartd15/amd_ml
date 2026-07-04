@@ -30,7 +30,7 @@ __host__ int main(){
 
     float seed = 1;
     float learning_rate = 0.1;
-    float iterations = 1000;
+    float iterations = 500;
     float tol_required = 0.01 * n_puntos;
 
     float gaussian_blurr = 0.1f;

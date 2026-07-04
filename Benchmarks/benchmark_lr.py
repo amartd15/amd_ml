@@ -1,13 +1,30 @@
 import sys
-sys.path.append("/build")  # para que Python encuentre el .so
 
-from amd_ml_py import linear_regression
-
-import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.linear_model import LinearRegression
-
+from pathlib import Path
 from timeit import time
+
+#Tratamos de importar la librería con la que trabajamos
+try:
+    build = Path(__file__).resolve().parent.parent / "build" #Teniendo en cuenta que se ejecuta desde la carpeta base del proyecto
+    print("\nBuscando librerias en -> ", build)
+
+    sys.path.append(str(build))  # para que Python encuentre el .so
+
+    from amd_ml_py import linear_regression
+except:
+    print("No se pudo enlazar con la libreria externa")
+    exit()
+
+#Importamos los otros paquetes, asegurándonos que el entorno virtual está activado
+try:
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from sklearn.linear_model import LinearRegression
+except ModuleNotFoundError:
+    print("No se activo debidamente el entorno virtual o hay un problema con las librerias externas")
+    exit()
+
+
 
 def create_matrix(n_points: int, n_dimentions: int) -> list[np.ndarray]:
     #We generate a linear regression with coefficients 1, 2, 3, ...
@@ -40,7 +57,7 @@ def comparation(X: np.ndarray, y: np.ndarray, terms: np.ndarray, print_data = Tr
     params: np.ndarray = linear_regression(
         X, y,
         n_iter=1000,
-        tolerance=0.01,
+        tolerance=0.01 * len(X),
         learning_rate=0.1
     )
     d = time.time()
@@ -99,7 +116,8 @@ def comparation_amd_sk(n_points: int, n_dim: int) -> None:
     plt.show()
 
 def main() -> None:
-    comparation_amd_sk(5, 10)
+    comparation(*create_matrix(1000, 2))
+    #comparation_amd_sk(5, 2)
 
 if __name__ == "__main__":
     main()

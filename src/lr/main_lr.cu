@@ -31,7 +31,7 @@ __host__ int main(){
     float seed = 1;
     float learning_rate = 0.1;
     float iterations = 1000;
-    float tol_required = 0.01 * n_puntos;
+    float tol_required = 0.003;
 
     float gaussian_blurr = 0.1f;
 
@@ -79,7 +79,7 @@ __host__ int main(){
     imprimir(model.parameters, "Parameters");
 
     std::cout << "-->MSE (mean squared error): " << model.mse / n_puntos << std::endl;
-    std::cout << "-->El proceso tardo " << ms/1000<< " segundos\n" << std::endl;
+    std::cout << "-->El proceso tardo " << ms<< " milisegundos\n" << std::endl;
 
     cleanContext(model);
     cleanUpDevice();
