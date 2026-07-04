@@ -33,7 +33,7 @@ __host__ amd_linear_regression SGD_linear_regression(
     context.gradient = gradient;
 
     context.decision = decision;
-    context.mse = calculateNorm(error);
+    context.mse = SGD_calculateNorm(error);
 
     return context;
 }

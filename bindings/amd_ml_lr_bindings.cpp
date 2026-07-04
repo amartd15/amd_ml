@@ -20,14 +20,6 @@ py::array_t<float> py_linear_regression(
     auto X_buf = X.request();
     auto y_buf = y.request();
 
-    // DEBUG
-    float* X_ptr = (float*)X_buf.ptr;
-    float* y_ptr = (float*)y_buf.ptr;
-    std::cout << "X[0,0]=" << X_ptr[0] << " X[0,1]=" << X_ptr[1] << std::endl;
-    std::cout << "X[1,0]=" << X_ptr[X_buf.shape[1]] << " X[1,1]=" << X_ptr[X_buf.shape[1]+1] << std::endl;
-    std::cout << "y[0]=" << y_ptr[0] << " y[1]=" << y_ptr[1] << std::endl;
-    std::cout << "n_points=" << X_buf.shape[0] << " n_param=" << X_buf.shape[1] << std::endl;
-
     int n_points     = X_buf.shape[0];
     int n_parameters = X_buf.shape[1];
 

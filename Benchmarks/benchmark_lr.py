@@ -11,8 +11,8 @@ try:
     sys.path.append(str(build))  # para que Python encuentre el .so
 
     from amd_ml_py import linear_regression
-except:
-    print("No se pudo enlazar con la libreria externa")
+except Exception as e:
+    print("No se pudo enlazar con la libreria externa-> ", e)
     exit()
 
 #Importamos los otros paquetes, asegurándonos que el entorno virtual está activado
