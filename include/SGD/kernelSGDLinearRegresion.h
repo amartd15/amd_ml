@@ -17,7 +17,7 @@ __global__ void StocasticGradientDescent(
 //Only brings back to host memory the parameters matrix, the rest is kept in device memory
 __host__ void SGDlinearRregresionKernel(
     tensor* X, tensor* y, tensor* parameters, tensor* gradient, tensor* error,
-    int n_param, int n_points, int n_iter, 
+    unsigned int n_param, unsigned int n_points, unsigned int n_iter, 
     float learning_rate, float desired_tol
 );
 

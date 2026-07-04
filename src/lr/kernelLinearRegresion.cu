@@ -76,7 +76,7 @@ __global__ void lr_updateParameters(
 //Only brings back to host memory the parameters matrix, the rest is kept in device memory
 __host__ void linearRregresionKernel(
     tensor* X, tensor* y, tensor* parameters, tensor* gradient, tensor* error,
-    int n_param, int n_points, int n_iter, 
+    unsigned int n_param, unsigned int n_points, unsigned int n_iter, 
     float learning_rate, float desired_tol
 ){
 
@@ -205,7 +205,7 @@ __host__ float lr_calculateNorm(tensor* vector){
     //We check for silent errors during the kernel launch
     cudaError_t err = cudaGetLastError();
     if(err != cudaSuccess){
-        std::cout << "Error launching the kernel" << std::endl;
+        std::cout << "Error launching the error kernel" << std::endl;
         exit(EXIT_FAILURE);
     }
 

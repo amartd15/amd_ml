@@ -22,7 +22,7 @@ if(LR)
     src/lr/kernelLinearRegresion.cu
     )
 
-    set_target_properties(amd_ml_lr_lib PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+    set_target_properties(amd_ml_lr_lib PROPERTIES CUDA_SEPARABLE_COMPILATION OFF)
 
     target_include_directories(amd_ml_lr_lib PUBLIC ${CMAKE_SOURCE_DIR}/include)
 
@@ -41,7 +41,7 @@ if(SGD)
     src/SGD/kernelSGDLinearRegresion.cu
     )
 
-    set_target_properties(amd_ml_SGD_lib PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+    set_target_properties(amd_ml_SGD_lib PROPERTIES CUDA_SEPARABLE_COMPILATION OFF)
 
     target_include_directories(amd_ml_SGD_lib PUBLIC ${CMAKE_SOURCE_DIR}/include)
 
