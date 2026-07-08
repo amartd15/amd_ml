@@ -116,8 +116,8 @@ def comparation_amd_sk(n_points: int, n_dim: int) -> None:
     plt.show()
 
 def main() -> None:
-    comparation(*create_matrix(1000, 2))
-    #comparation_amd_sk(5, 2)
+    #comparation(*create_matrix(1000, 2))
+    comparation_amd_sk(7, 20)
 
 if __name__ == "__main__":
     main()

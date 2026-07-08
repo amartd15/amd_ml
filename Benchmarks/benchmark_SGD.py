@@ -115,7 +115,7 @@ def comparation_amd_sk(n_points: int, n_dim: int) -> None:
     plt.show()
 
 def main() -> None:
-    comparation_amd_sk(5, 2)
+    comparation_amd_sk(5, 10)
 
 if __name__ == "__main__":
     main()
