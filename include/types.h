@@ -12,6 +12,15 @@ struct tensor{
     int rows;
 };
 
+struct lr_hiperparameters{
+    float* tol;
+    float* alpha;
+    float* alpha_reduction;
+    float* alpha_min;
+    int*   first_iteration;
+    int* iter;
+};
+
 // For dealing fith bias or not
 enum bias{
     NO_BIAS,
@@ -25,9 +34,9 @@ struct amd_linear_regression{
     tensor* point_matrix;
     tensor* result_matrix;
     tensor* gradient;
+    tensor* mse;
 
     bias decision;
-    float mse;
 };
 
 // Used in functions to handle memory, specifies the direcction of the data transfer

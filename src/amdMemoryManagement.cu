@@ -61,23 +61,17 @@ __host__ tensor* createTensor(float seed, int rows, int cols){
 
 //Create a unique pointer to a variable in GPU
 template <typename T>
-__host__ T* createPointer(T data){
-    T* data_ptr = (T*)malloc(sizeof(T));
+__host__ T* createSharedPointer(T data){
+    T* data_shared = &data;
     cudaError_t err;
 
-    err = cudaMalloc((void**) data_ptr, sizeof(T));
+    err = cudaMallocManaged((void**) data_shared, sizeof(T));
     if(err != cudaSuccess){
-        std::cout << "Error guardando memoria. Codigo de error-> " << cudaGetErrorString(err) << std::endl;
+        std::cout << "Error creando memoria compartida. Codigo de error-> " << cudaGetErrorString(err) << std::endl;
         exit(EXIT_FAILURE);
     }
 
-    err = cudaMemcpy((void*) data_ptr, (void*) &data, sizeof(T), cudaMemcpyDeviceToHost);
-    if(err != cudaSuccess){
-        std::cout << "Error copiando memoria. Codigo de error-> " << cudaGetErrorString(err) << std::endl;
-        exit(EXIT_FAILURE);
-    }
-
-    return data_ptr;
+    return data_shared;
 }
 
 //Allocates memory in RAM
@@ -228,6 +222,7 @@ __host__ void cleanContext(amd_linear_regression context){
     freeTensor(context.gradient);
     freeTensor(context.result_matrix, context.decision);
     freeTensor(context.point_matrix, context.decision);
+    freeTensor(context.mse);
 }
 
 

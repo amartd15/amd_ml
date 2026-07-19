@@ -8,14 +8,7 @@
 __global__ void lr_gradientDescent(
     const float* d_X, const float* d_y, 
     float* param, float* grad, float* error,
-    int n_points, int n_param
-);
-
-
-//Update the parameters matrix in GPU
-__global__ void lr_updateParameters(
-    float* parameters, float* gradent, 
-    float alpha, int n_points, int n_param
+    int n_points, int n_param, float* alpha
 );
 
 
@@ -32,13 +25,17 @@ __host__ void linearRregresionKernel(
 
 //Every 10 iterations we check if the tolerance is met, if we detect a bounce back
 //We reduce a 90% the learning rate, until it reches 1e-10
-__host__ bool lr_checkError(int iter, float desired_tol, tensor* mse, float* alpha, tensor* error);
+__host__ bool lr_checkError(tensor* error, float* mse, float* mse_aux, lr_hiperparameters* param);
 
 
 //Encapsulates the launch of a kernel that calculates the euclidean norm of an horizontal or vertical vector
-__host__ float lr_calculateNorm(tensor* vector);
+__host__ void lr_calculateNorm(tensor* error, float* mse_aux);
+
+
+//Identifies if we had a bouncce back
+__host__ bool lr_compare_mse(float* mse, float* mse_aux, lr_hiperparameters* param);
 
 
 //Performs the euclidean norm of a vactor in GPU
-__global__ void lr_norm(float* data, float* norm, int size);
+__global__ void lr_norm(float* data, float* value, int size);
 

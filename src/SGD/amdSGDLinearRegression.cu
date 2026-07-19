@@ -22,11 +22,10 @@ __host__ amd_linear_regression SGD_linear_regression(
     tensor* matrix_result = createTensor(result_matrix, n_points, 1);
     tensor* parameters = createTensor(initial_seed, n_parameters, 1);
     tensor* error = createTensor(n_points, 1);
-    tensor* gradient = createTensor(1, 1);
 
     //We call the real function
     SGDlinearRregresionKernel(
-        matrix_points, matrix_result, parameters, gradient, error,
+        matrix_points, matrix_result, parameters, error,
         n_parameters, n_points, n_iter, 
         learning_rate, desired_tolerance
     );
@@ -38,7 +37,7 @@ __host__ amd_linear_regression SGD_linear_regression(
     context.parameters = parameters;
     context.point_matrix = matrix_points;
     context.result_matrix = matrix_result;
-    context.gradient = gradient;
+    context.gradient = createTensor(0.0f, 1, 1); //Empty value
 
     context.decision = decision;
     context.mse = SGD_calculateNorm(error);

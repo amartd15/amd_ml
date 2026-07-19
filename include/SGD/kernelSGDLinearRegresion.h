@@ -16,7 +16,7 @@ __global__ void StocasticGradientDescent(
 //This function encapsulates the process of launching the kernel of the SGD linear regression.
 //Only brings back to host memory the parameters matrix, the rest is kept in device memory
 __host__ void SGDlinearRregresionKernel(
-    tensor* X, tensor* y, tensor* parameters, tensor* gradient, tensor* error,
+    tensor* X, tensor* y, tensor* parameters, tensor* error,
     unsigned int n_param, unsigned int n_points, unsigned int n_iter, 
     float learning_rate, float desired_tol
 );

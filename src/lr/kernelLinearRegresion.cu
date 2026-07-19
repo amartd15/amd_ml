@@ -13,7 +13,7 @@
 __global__ void lr_gradientDescent(
     const float* d_X, const float* d_y, 
     float* param, float* grad, float* error,
-    int n_points, int n_param
+    int n_points, int n_param, float* alpha
 ){
 
     int idx = threadIdx.x + blockDim.x * blockIdx.x;
@@ -55,20 +55,13 @@ __global__ void lr_gradientDescent(
 
     }
 
-}
+    __syncthreads();
 
-
-//Update the parameters matrix in GPU
-__global__ void lr_updateParameters(
-    float* parameters, float* gradent, 
-    float alpha, int n_points, int n_param
-){
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    
     //Updates the parameters, with alpha/n_points as pseudo learning rate
     if(idx < n_param){
-        parameters[idx] -= gradent[idx] * alpha / n_points; 
+        param[idx] -= grad[idx] * *alpha / n_points; 
     }
+
 }
 
 
@@ -84,18 +77,39 @@ __host__ void linearRregresionKernel(
     int length = (n_param < n_points) ? n_points : n_param;
 
     //We define the variables needed for launching the kernel
-    dim3 numThreads, numBlocks, numThreadsParameters;
+    dim3 numThreads, numBlocks;
 
     numThreads = {128, 1, 1}; //After some benchmarks the best result is given with 128 - 256 threads per block
     numBlocks = {(int) (length + numThreads.x - 1) / numThreads.x, 1, 1};
-
-    numThreadsParameters = {n_param, 1, 1};
 
     //We define the shared memory we will be using
     int shared_mem = numThreads.x * sizeof(float);
 
     int iter = 0;
-    tensor* mse = createTensor(0.0f, 1, 1); //For tracking if the model bounces back
+
+    //We create shared variables
+    float* smse             = createSharedPointer(0.0f);
+    float* smse_aux         = createSharedPointer(0.0f);
+    float* slearning_rate   = createSharedPointer(learning_rate);
+    float* stol             = createSharedPointer(desired_tol);
+    bool*  sconvergence     = createSharedPointer(true);
+    int*   siter            = createSharedPointer(iter);
+
+    //We define some hiperparameters
+    int*   first_iteration  = createSharedPointer(ITERATION_CHECK_N);
+    float* alpha_reduction  = createSharedPointer(LEARNING_RATE_REDUCTION);
+    float* alpha_min        = createSharedPointer(MINIMUM_LEARNING_RATE);
+
+    lr_hiperparameters* hiperparameters = (lr_hiperparameters*)malloc(sizeof(lr_hiperparameters));
+
+    *hiperparameters = {
+        stol,
+        slearning_rate,
+        alpha_reduction,
+        alpha_min,
+        first_iteration,
+        siter
+    };
 
     //The main loop of the algorithm
     do{
@@ -105,17 +119,12 @@ __host__ void linearRregresionKernel(
         lr_gradientDescent <<<numBlocks, numThreads, shared_mem>>>(
             X->data_d, y->data_d,
             parameters->data_d, gradient->data_d, error->data_d,
-            n_points, n_param
-        );
-
-        lr_updateParameters <<<1, numThreadsParameters>>>(
-            parameters->data_d, gradient->data_d, 
-            learning_rate, n_points, n_param
+            n_points, n_param, slearning_rate
         );
 
     }while(
         (++iter < n_iter) &&
-        (lr_checkError(iter, desired_tol, mse, &learning_rate, error))    
+        (lr_checkError(error, smse, smse_aux, hiperparameters))    
     );
 
     cudaDeviceSynchronize();
@@ -130,8 +139,6 @@ __host__ void linearRregresionKernel(
     //We bring back only the parameters
     copyMemory(parameters, DEVICE_TO_HOST);
 
-    //We free the pointer used for tracking the mse
-    freeTensor(mse);
 }
 
 
@@ -139,37 +146,13 @@ __host__ void linearRregresionKernel(
 
 //Every ITERATION_CHECK_N iterations we check if the tolerance is met, if we detect a bounce back
 //We reduce by LEARNING_RATE_REDUCTION the learning rate, until it reches MINIMUM_LEARNING_RATE
-__host__ bool lr_checkError(int iter, float desired_tol, tensor* mse, float* alpha, tensor* error){
+__host__ bool lr_checkError(tensor* error, float* mse, float* mse_aux, lr_hiperparameters* param){
     
-    if(iter % ITERATION_CHECK_N == 0){
+    if(*param->iter % ITERATION_CHECK_N == 0){
 
-        //We use an auxiliary variable to compare with the value of the previous iteration so that
-        //we can catch when the gradent "bounces" back
+        lr_calculateNorm(error, mse_aux);
 
-        float mse_aux = lr_calculateNorm(error);
-
-        //If we detect a bounce back, we modify the learning rate
-        if (
-            (*mse->data_h < mse_aux) &&
-            (iter != ITERATION_CHECK_N) //For not reducing the learning rate at the beggining
-        ){
-            *alpha *= LEARNING_RATE_REDUCTION; //Reduce the learning rate
-
-            if(*alpha <= MINIMUM_LEARNING_RATE) {return false;}
-
-            std::cout << "Se ha cambiado la tasa de aprendizaje en la " << iter << " iteracion. Alpha = "<< *alpha << std::endl;
-        }
-
-        //We swap the values
-        *mse->data_h = mse_aux;
-
-        //We check if the tolerance is met
-        if(*mse->data_h <= desired_tol){
-            std::cout << "Se ha alcanzado la tolerancia esperada a las " << iter << " iteraciones\n" << std::endl;
-            return false;
-        }
-
-        return true;
+        return lr_compare_mse(mse, mse_aux, param);
 
     }else{
         return true;
@@ -178,45 +161,60 @@ __host__ bool lr_checkError(int iter, float desired_tol, tensor* mse, float* alp
 
 
 //Encapsulates the launch of a kernel that calculates the euclidean norm of an horizontal or vertical vector
-__host__ float lr_calculateNorm(tensor* vector){
+__host__ void lr_calculateNorm(tensor* error, float* mse_aux){
+        int size;
 
-    //An auxiliary variable initalized with 0 values
-    tensor* mse_squared = createTensor(0.0f, 1, 1);
+        //We calculate wether the vector is a row or a column
+        if(min(error->rows, error->columns) == 1){
+            size = max(error->rows, error->columns);
+        }else{
+            std::cout << "Error, trying to calculate the norm of a matrix" << std::endl;
+            exit(EXIT_FAILURE);
+        }
 
-    int size;
+        //Some parameters to launch the kernel
+        dim3 numThreads = {128, 1, 1};
+        dim3 numBlocks  = {(int) (size + numThreads.x -1) / numThreads.x, 1, 1};
 
-    //We calculate wether the vector is a row or a column
-    if(min(vector->rows, vector->columns) == 1){
-        size = max(vector->rows, vector->columns);
-    }else{
-        std::cout << "Error, trying to calculate the norm of a matrix" << std::endl;
+        //Shared memory
+        int sharedMem = numThreads.x * sizeof(float);
+
+        //We launch the kernel
+        lr_norm<<<numBlocks, numThreads, sharedMem>>>(error->data_d, mse_aux, size);
+
+        //We check for silent errors during the kernel launch
+        cudaError_t err = cudaGetLastError();
+        if(err != cudaSuccess){
+            std::cout << "Error launching the error kernel" << std::endl;
+            exit(EXIT_FAILURE);
+        }
+}
+
+
+//Identifies if we had a bouncce back
+__host__ bool lr_compare_mse(float* mse, float* mse_aux, lr_hiperparameters* param){
+    //If we detect a bounce back, we modify the learning rate
+    if (
+        (*mse < *mse_aux) &&
+        (*param->iter != ITERATION_CHECK_N) //For not reducing the learning rate at the beggining
+    ){
+        *param->alpha *= LEARNING_RATE_REDUCTION; //Reduce the learning rate
+
+        if(*param->alpha <= MINIMUM_LEARNING_RATE) {return false;}
+
+        std::cout << "Se ha cambiado la tasa de aprendizaje en la " << *param->iter << " iteracion. Alpha = "<< *param->alpha << std::endl;
     }
 
-    //Some parameters to launch the kernel
-    dim3 numThreads = {128, 1, 1};
-    dim3 numBlocks  = {(int) (size + numThreads.x -1) / numThreads.x, 1, 1};
+    //We swap the values
+    *mse = *mse_aux;
 
-    //Shared memory
-    int sharedMem = numThreads.x * sizeof(float);
-
-    //We launch the kernel
-    lr_norm<<<numBlocks, numThreads, sharedMem>>>(vector->data_d, mse_squared->data_d, size);
-
-    //We check for silent errors during the kernel launch
-    cudaError_t err = cudaGetLastError();
-    if(err != cudaSuccess){
-        std::cout << "Error launching the error kernel" << std::endl;
-        exit(EXIT_FAILURE);
+    //We check if the tolerance is met
+    if(*mse <= *param->tol){
+        std::cout << "Se ha alcanzado la tolerancia esperada a los " << *param->iter << " barridos\n" << std::endl;
+        return false;
     }
 
-    //Bring back the mse squared to host memory and storeing it on a variable
-    copyMemory(mse_squared, DEVICE_TO_HOST);
-    float value = *mse_squared->data_h;
-
-    //To avoid memory leaks (on each iteration allocate memory and not cleaning it)
-    freeTensor(mse_squared);
-
-    return sqrt(value);
+    return true;
 }
 
 
@@ -243,6 +241,9 @@ __global__ void lr_norm(float* data, float* value, int size){
     }
 
     //We add the result of each block into a variable
-    if(tdx == 0) {atomicAdd(value, buffer[0]);}
+    if(tdx == 0) {
+        atomicAdd(value, buffer[0]);
+        *value = *value / size;
+    }
 
 }

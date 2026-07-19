@@ -41,7 +41,7 @@ __host__ amd_linear_regression linear_regression(
     context.gradient = gradient;
 
     context.decision = decision;
-    context.mse = lr_calculateNorm(error);
+    //context.mse = mse;
 
     //We return all the calculated data in a structure
     return context;

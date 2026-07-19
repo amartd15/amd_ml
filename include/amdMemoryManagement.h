@@ -7,7 +7,7 @@ __host__ tensor* createTensor(float* data, int rows, int cols);
 __host__ tensor* createTensor(float seed, int rows, int cols);
 
 template <typename T>
-__host__ T* createPointer(T data);
+__host__ T* createSharedPointer(T data);
 
 __host__ float* allocatePinnedMemory(size_t size);
 __host__ float* allocateDeviceMemory(size_t size);
