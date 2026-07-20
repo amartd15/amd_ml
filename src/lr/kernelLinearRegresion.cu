@@ -88,28 +88,23 @@ __host__ void linearRregresionKernel(
     int iter = 0;
 
     //We create shared variables
-    float* smse             = createSharedPointer(0.0f);
-    float* smse_aux         = createSharedPointer(0.0f);
-    float* slearning_rate   = createSharedPointer(learning_rate);
-    float* stol             = createSharedPointer(desired_tol);
-    bool*  sconvergence     = createSharedPointer(true);
-    int*   siter            = createSharedPointer(iter);
+    float aux1 = 0.0f;
+    float aux2 = 0.0f;
+    float* smse             = createSharedPointer(&aux1);
+    float* smse_aux         = createSharedPointer(&aux2);
+    float* slearning_rate   = createSharedPointer(&learning_rate);
 
-    //We define some hiperparameters
-    int*   first_iteration  = createSharedPointer(ITERATION_CHECK_N);
-    float* alpha_reduction  = createSharedPointer(LEARNING_RATE_REDUCTION);
-    float* alpha_min        = createSharedPointer(MINIMUM_LEARNING_RATE);
-
+    //We create the structure with the hiperparameters
     lr_hiperparameters* hiperparameters = (lr_hiperparameters*)malloc(sizeof(lr_hiperparameters));
 
-    *hiperparameters = {
-        stol,
-        slearning_rate,
-        alpha_reduction,
-        alpha_min,
-        first_iteration,
-        siter
-    };
+    hiperparameters->alpha           = slearning_rate;
+    hiperparameters->current_iter    = &iter;
+    hiperparameters->first_iteration = ITERATION_CHECK_N;
+    hiperparameters->iter            = n_iter;
+    hiperparameters->tol             = desired_tol;
+    hiperparameters->initial_alpha   = learning_rate;
+    hiperparameters->alpha_reduction = LEARNING_RATE_REDUCTION;
+    hiperparameters->alpha_min       = MINIMUM_LEARNING_RATE;
 
     //The main loop of the algorithm
     do{
@@ -127,8 +122,6 @@ __host__ void linearRregresionKernel(
         (lr_checkError(error, smse, smse_aux, hiperparameters))    
     );
 
-    cudaDeviceSynchronize();
-
     //We check for silent errors
     cudaError_t err = cudaGetLastError();
     if(err != cudaSuccess){
@@ -136,9 +129,16 @@ __host__ void linearRregresionKernel(
         exit(EXIT_FAILURE);
     }
 
+    err = cudaDeviceSynchronize();
+    if(err != cudaSuccess){
+        std::cout << "Error synchronizing the device. Error string -> " << cudaGetErrorString(err) << std::endl;
+        exit(EXIT_FAILURE);
+    }   
+
     //We bring back only the parameters
     copyMemory(parameters, DEVICE_TO_HOST);
 
+    cudaFree(smse_aux);
 }
 
 
@@ -146,13 +146,13 @@ __host__ void linearRregresionKernel(
 
 //Every ITERATION_CHECK_N iterations we check if the tolerance is met, if we detect a bounce back
 //We reduce by LEARNING_RATE_REDUCTION the learning rate, until it reches MINIMUM_LEARNING_RATE
-__host__ bool lr_checkError(tensor* error, float* mse, float* mse_aux, lr_hiperparameters* param){
+__host__ bool lr_checkError(tensor* error, float* mse, float* mse_aux, lr_hiperparameters* hiperparam){
     
-    if(*param->iter % ITERATION_CHECK_N == 0){
+    if(*hiperparam->current_iter % ITERATION_CHECK_N == 0){
 
         lr_calculateNorm(error, mse_aux);
 
-        return lr_compare_mse(mse, mse_aux, param);
+        return lr_compare_mse(mse, mse_aux, hiperparam);
 
     }else{
         return true;
@@ -180,12 +180,21 @@ __host__ void lr_calculateNorm(tensor* error, float* mse_aux){
         int sharedMem = numThreads.x * sizeof(float);
 
         //We launch the kernel
+        cudaMemset((void*) mse_aux, 0.0f, sizeof(float));
         lr_norm<<<numBlocks, numThreads, sharedMem>>>(error->data_d, mse_aux, size);
+
+        *mse_aux /= size; //According to the formula
 
         //We check for silent errors during the kernel launch
         cudaError_t err = cudaGetLastError();
         if(err != cudaSuccess){
-            std::cout << "Error launching the error kernel" << std::endl;
+            std::cout << "Error launching the error kernel. Error string -> " << cudaGetErrorString(err) << std::endl;
+            exit(EXIT_FAILURE);
+        }
+
+        err = cudaDeviceSynchronize();
+        if(err != cudaSuccess){
+            std::cout << "Error synchronizing the device. Error string -> " << cudaGetErrorString(err) << std::endl;
             exit(EXIT_FAILURE);
         }
 }
@@ -196,21 +205,26 @@ __host__ bool lr_compare_mse(float* mse, float* mse_aux, lr_hiperparameters* par
     //If we detect a bounce back, we modify the learning rate
     if (
         (*mse < *mse_aux) &&
-        (*param->iter != ITERATION_CHECK_N) //For not reducing the learning rate at the beggining
+        (*param->current_iter != ITERATION_CHECK_N) //For not reducing the learning rate at the beggining
     ){
         *param->alpha *= LEARNING_RATE_REDUCTION; //Reduce the learning rate
 
         if(*param->alpha <= MINIMUM_LEARNING_RATE) {return false;}
 
-        std::cout << "Se ha cambiado la tasa de aprendizaje en la " << *param->iter << " iteracion. Alpha = "<< *param->alpha << std::endl;
+        std::cout << "Se ha cambiado la tasa de aprendizaje en la " 
+                  << *param->current_iter << " iteracion. Alpha = "
+                  << *param->alpha << std::endl;
     }
 
     //We swap the values
     *mse = *mse_aux;
 
     //We check if the tolerance is met
-    if(*mse <= *param->tol){
-        std::cout << "Se ha alcanzado la tolerancia esperada a los " << *param->iter << " barridos\n" << std::endl;
+    if(*mse <= param->tol){
+        std::cout << "Se ha alcanzado la tolerancia esperada a las " 
+                  << *param->current_iter 
+                  << " iteraciones\n" 
+                  << std::endl;
         return false;
     }
 
@@ -241,9 +255,5 @@ __global__ void lr_norm(float* data, float* value, int size){
     }
 
     //We add the result of each block into a variable
-    if(tdx == 0) {
-        atomicAdd(value, buffer[0]);
-        *value = *value / size;
-    }
-
+    if(tdx == 0) { atomicAdd(value, buffer[0]); }
 }

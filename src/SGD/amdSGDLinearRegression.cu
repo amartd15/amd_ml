@@ -40,7 +40,7 @@ __host__ amd_linear_regression SGD_linear_regression(
     context.gradient = createTensor(0.0f, 1, 1); //Empty value
 
     context.decision = decision;
-    context.mse = SGD_calculateNorm(error);
+    //context.mse = SGD_calculateNorm(error);
 
     //We return all the calculated data in a structure
     return context;

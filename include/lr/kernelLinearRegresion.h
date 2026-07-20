@@ -33,7 +33,7 @@ __host__ void lr_calculateNorm(tensor* error, float* mse_aux);
 
 
 //Identifies if we had a bouncce back
-__host__ bool lr_compare_mse(float* mse, float* mse_aux, lr_hiperparameters* param);
+__host__ bool lr_compare_mse(float* mse, float* mse_aux, lr_hiperparameters* hiperparam);
 
 
 //Performs the euclidean norm of a vactor in GPU

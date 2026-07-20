@@ -13,12 +13,17 @@ struct tensor{
 };
 
 struct lr_hiperparameters{
-    float* tol;
-    float* alpha;
-    float* alpha_reduction;
-    float* alpha_min;
-    int*   first_iteration;
-    int* iter;
+
+    float*  alpha; //the current learning rate in this iteration
+    int*    current_iter;
+
+    int     first_iteration;
+    int     iter;
+
+    float   tol;
+    float   initial_alpha;
+    float   alpha_reduction;
+    float   alpha_min;
 };
 
 // For dealing fith bias or not
