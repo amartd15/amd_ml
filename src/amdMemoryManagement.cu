@@ -207,7 +207,7 @@ __host__ void cleanContext(amd_linear_regression context){
     freeTensor(context.gradient);
     freeTensor(context.result_matrix, context.decision);
     freeTensor(context.point_matrix, context.decision);
-    freeTensor(context.mse);
+    //freeTensor(context.mse);
 }
 
 

@@ -7,16 +7,20 @@ __host__ tensor* createTensor(float* data, int rows, int cols);
 __host__ tensor* createTensor(float seed, int rows, int cols);
 
 //Create a unique pointer to a variable in GPU
-template <typename T>
-__host__ T* createSharedPointer(T* data){
+template<typename T>
+__host__ T* createSharedPointer(T value){
 
-    cudaError_t err = cudaMallocManaged((void**) &data, sizeof(T));
+    T* aux = (T*)malloc(sizeof(T));
+
+    cudaError_t err = cudaMallocManaged((void**) &aux, sizeof(T));
     if(err != cudaSuccess){
         std::cout << "Error creando memoria compartida. Codigo de error-> " << cudaGetErrorString(err) << std::endl;
         exit(EXIT_FAILURE);
     }
 
-    return data;
+    *aux = value;
+
+    return aux;
 }
 
 __host__ float* allocatePinnedMemory(size_t size);

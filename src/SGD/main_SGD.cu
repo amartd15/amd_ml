@@ -78,7 +78,7 @@ __host__ int main(){
 
     imprimir(model.parameters, "Parameters");
 
-    std::cout << "-->MSE (mean squared error): " << model.mse / n_puntos << std::endl;
+    //std::cout << "-->MSE (mean squared error): " << model.mse / n_puntos << std::endl;
     std::cout << "-->El proceso tardo " << ms << " milisegundos\n" << std::endl;
 
     cleanContext(model);

@@ -39,7 +39,7 @@ struct amd_linear_regression{
     tensor* point_matrix;
     tensor* result_matrix;
     tensor* gradient;
-    tensor* mse;
+    //tensor* mse;
 
     bias decision;
 };

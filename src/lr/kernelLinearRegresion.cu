@@ -90,9 +90,11 @@ __host__ void linearRregresionKernel(
     //We create shared variables
     float aux1 = 0.0f;
     float aux2 = 0.0f;
-    float* smse             = createSharedPointer(&aux1);
-    float* smse_aux         = createSharedPointer(&aux2);
-    float* slearning_rate   = createSharedPointer(&learning_rate);
+    float* smse             = createSharedPointer(aux1);
+    float* smse_aux         = createSharedPointer(aux2);
+    float* slearning_rate   = createSharedPointer(learning_rate); 
+
+    std::cout << "Learning rate-> " << *slearning_rate << std::endl;
 
     //We create the structure with the hiperparameters
     lr_hiperparameters* hiperparameters = (lr_hiperparameters*)malloc(sizeof(lr_hiperparameters));
@@ -139,6 +141,9 @@ __host__ void linearRregresionKernel(
     copyMemory(parameters, DEVICE_TO_HOST);
 
     cudaFree(smse_aux);
+    cudaFree(smse);
+    cudaFree(slearning_rate);
+    free(hiperparameters);
 }
 
 
@@ -204,7 +209,7 @@ __host__ void lr_calculateNorm(tensor* error, float* mse_aux){
 __host__ bool lr_compare_mse(float* mse, float* mse_aux, lr_hiperparameters* param){
     //If we detect a bounce back, we modify the learning rate
     if (
-        (*mse < *mse_aux) &&
+        (*mse > *mse_aux) &&
         (*param->current_iter != ITERATION_CHECK_N) //For not reducing the learning rate at the beggining
     ){
         *param->alpha *= LEARNING_RATE_REDUCTION; //Reduce the learning rate

@@ -4,6 +4,13 @@ set(CMAKE_CUDA_COMPILER /usr/local/cuda-12.5/bin/nvcc)
 
 project(amd_ml LANGUAGES CXX CUDA)
 
+#Para poder hacer debugging
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose Debug or Release" FORCE)
+endif()
+
+set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -G -g")
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CUDA_STANDARD 17)
 
