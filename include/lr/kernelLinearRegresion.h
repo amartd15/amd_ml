@@ -12,6 +12,9 @@ __global__ void lr_gradientDescent(
 );
 
 
+__global__ void lr_update_param(float* param, float* grad, float *alpha, int n_points, int n_param);
+
+
 //This function encapsulates the process of launching the kernel of the linear regression.
 //Only brings back to host memory the parameters matrix, the rest is kept in device memory
 __host__ void linearRregresionKernel(
@@ -33,7 +36,7 @@ __host__ void lr_calculateNorm(tensor* error, float* mse_aux);
 
 
 //Identifies if we had a bouncce back
-__host__ bool lr_compare_mse(float* mse, float* mse_aux, lr_hiperparameters* hiperparam);
+__host__ bool lr_compare_mse(tensor* error, float* mse, float* mse_aux, lr_hiperparameters* hiperparam);
 
 
 //Performs the euclidean norm of a vactor in GPU

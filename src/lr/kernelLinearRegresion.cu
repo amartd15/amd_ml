@@ -2,7 +2,7 @@
 #include "amdMemoryManagement.h"
 
 //Some hiperparameters
-#define ITERATION_CHECK_N 10
+#define ITERATION_CHECK_N 100
 #define LEARNING_RATE_REDUCTION 0.1f
 #define MINIMUM_LEARNING_RATE 1e-10f
 
@@ -54,14 +54,15 @@ __global__ void lr_gradientDescent(
         if(tdx == 0) {atomicAdd(&grad[k], buffer[0]); }
 
     }
+}
 
-    __syncthreads();
+__global__ void lr_update_param(float* param, float* grad, float *alpha, int n_points, int n_param){
 
-    //Updates the parameters, with alpha/n_points as pseudo learning rate
+    int idx = threadIdx.x + blockDim.x * blockIdx.x;
+
     if(idx < n_param){
         param[idx] -= grad[idx] * *alpha / n_points; 
     }
-
 }
 
 
@@ -77,10 +78,11 @@ __host__ void linearRregresionKernel(
     int length = (n_param < n_points) ? n_points : n_param;
 
     //We define the variables needed for launching the kernel
-    dim3 numThreads, numBlocks;
+    dim3 numThreads, numBlocks, numBlocksParam;;
 
     numThreads = {128, 1, 1}; //After some benchmarks the best result is given with 128 - 256 threads per block
     numBlocks = {(int) (length + numThreads.x - 1) / numThreads.x, 1, 1};
+    numBlocksParam = {(int) (n_param + numThreads.x - 1) / numThreads.x, 1, 1};
 
     //We define the shared memory we will be using
     int shared_mem = numThreads.x * sizeof(float);
@@ -119,9 +121,13 @@ __host__ void linearRregresionKernel(
             n_points, n_param, slearning_rate
         );
 
+        lr_update_param <<<numBlocksParam, numThreads>>>(
+            parameters->data_d, gradient->data_d, slearning_rate, n_points, n_param
+        );
+
     }while(
         (++iter < n_iter) &&
-        (lr_checkError(error, smse, smse_aux, hiperparameters))    
+        (lr_compare_mse(error, smse, smse_aux, hiperparameters))    
     );
 
     //We check for silent errors
@@ -157,7 +163,7 @@ __host__ bool lr_checkError(tensor* error, float* mse, float* mse_aux, lr_hiperp
 
         lr_calculateNorm(error, mse_aux);
 
-        return lr_compare_mse(mse, mse_aux, hiperparam);
+        return lr_compare_mse(error, mse, mse_aux, hiperparam);
 
     }else{
         return true;
@@ -185,10 +191,8 @@ __host__ void lr_calculateNorm(tensor* error, float* mse_aux){
         int sharedMem = numThreads.x * sizeof(float);
 
         //We launch the kernel
-        cudaMemset((void*) mse_aux, 0.0f, sizeof(float));
+        cudaMemsetAsync(mse_aux, 0, sizeof(float));
         lr_norm<<<numBlocks, numThreads, sharedMem>>>(error->data_d, mse_aux, size);
-
-        *mse_aux /= size; //According to the formula
 
         //We check for silent errors during the kernel launch
         cudaError_t err = cudaGetLastError();
@@ -197,7 +201,7 @@ __host__ void lr_calculateNorm(tensor* error, float* mse_aux){
             exit(EXIT_FAILURE);
         }
 
-        err = cudaDeviceSynchronize();
+        //err = cudaDeviceSynchronize();
         if(err != cudaSuccess){
             std::cout << "Error synchronizing the device. Error string -> " << cudaGetErrorString(err) << std::endl;
             exit(EXIT_FAILURE);
@@ -206,10 +210,16 @@ __host__ void lr_calculateNorm(tensor* error, float* mse_aux){
 
 
 //Identifies if we had a bouncce back
-__host__ bool lr_compare_mse(float* mse, float* mse_aux, lr_hiperparameters* param){
+__host__ bool lr_compare_mse(tensor* error, float* mse, float* mse_aux, lr_hiperparameters* param){
+    
+    if(*param->current_iter % ITERATION_CHECK_N != 0) { return true; }
+
+    //Calculate the mse of this iteration
+    lr_calculateNorm(error, mse_aux);
+    
     //If we detect a bounce back, we modify the learning rate
     if (
-        (*mse > *mse_aux) &&
+        (*mse < *mse_aux) &&
         (*param->current_iter != ITERATION_CHECK_N) //For not reducing the learning rate at the beggining
     ){
         *param->alpha *= LEARNING_RATE_REDUCTION; //Reduce the learning rate
@@ -246,7 +256,7 @@ __global__ void lr_norm(float* data, float* value, int size){
     int tdx = threadIdx.x;
 
     //We fill the shared memory with each element of the error squared
-    buffer[tdx] = (idx < size) ? data[idx] * data[idx] : 0.0f;
+    buffer[tdx] = (idx < size) ? data[idx] * data[idx] / size : 0.0f;
 
     __syncthreads();
 
