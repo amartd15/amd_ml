@@ -92,9 +92,12 @@ __host__ void linearRregresionKernel(
     //We create shared variables
     float aux1 = 0.0f;
     float aux2 = 0.0f;
+    bool  aux3 = false;
+
     float* smse             = createSharedPointer(aux1);
     float* smse_aux         = createSharedPointer(aux2);
     float* slearning_rate   = createSharedPointer(learning_rate); 
+    bool*  sbounce          = createSharedPointer(aux3);
 
     std::cout << "Learning rate-> " << *slearning_rate << std::endl;
 
@@ -115,64 +118,91 @@ __host__ void linearRregresionKernel(
         //Reset the gradent
         cudaMemsetAsync(gradient->data_d, 0, n_param * sizeof(float));
 
+        //Calculate the gradent
         lr_gradientDescent <<<numBlocks, numThreads, shared_mem>>>(
             X->data_d, y->data_d,
             parameters->data_d, gradient->data_d, error->data_d,
             n_points, n_param, slearning_rate
         );
 
+        //Update the parameters
         lr_update_param <<<numBlocksParam, numThreads>>>(
             parameters->data_d, gradient->data_d, slearning_rate, n_points, n_param
         );
 
     }while(
         (++iter < n_iter) &&
-        (lr_compare_mse(error, smse, smse_aux, hiperparameters))    
+        (lr_compare_mse(error, smse, smse_aux, hiperparameters, sbounce))    
     );
 
     //We check for silent errors
-    cudaError_t err = cudaGetLastError();
-    if(err != cudaSuccess){
-        std::cout << "Error during the kernel launch. Error message -> " << cudaGetErrorString(err) << std::endl;
-        exit(EXIT_FAILURE);
-    }
+    CUDA_CHECK(cudaGetLastError(), "Launching the kernels of the linear regression");
 
-    err = cudaDeviceSynchronize();
-    if(err != cudaSuccess){
-        std::cout << "Error synchronizing the device. Error string -> " << cudaGetErrorString(err) << std::endl;
-        exit(EXIT_FAILURE);
-    }   
+    //We syncronize de device
+    CUDA_CHECK(cudaDeviceSynchronize(), "Device syncronization");  
 
     //We bring back only the parameters
     copyMemory(parameters, DEVICE_TO_HOST);
 
-    cudaFree(smse_aux);
-    cudaFree(smse);
-    cudaFree(slearning_rate);
+    //Free shared pointers
+    CUDA_CHECK(cudaFree(smse_aux), "Free smse_aux");
+    CUDA_CHECK(cudaFree(smse), "Free smse");
+    CUDA_CHECK(cudaFree(slearning_rate), "Free slearning_rate");
+    CUDA_CHECK(cudaFree(sbounce), "Free sbounce");
+    
+    //Free the hiperparameters structure
     free(hiperparameters);
 }
 
 
 //-------------------------------------------------- CHECK TOLERANCES -------------------------------------------//
 
-//Every ITERATION_CHECK_N iterations we check if the tolerance is met, if we detect a bounce back
-//We reduce by LEARNING_RATE_REDUCTION the learning rate, until it reches MINIMUM_LEARNING_RATE
-__host__ bool lr_checkError(tensor* error, float* mse, float* mse_aux, lr_hiperparameters* hiperparam){
+
+//Identifies if we had a bouncce back
+__host__ bool lr_compare_mse(tensor* error, float* mse, float* mse_aux, lr_hiperparameters* param, bool* bounce){
     
-    if(*hiperparam->current_iter % ITERATION_CHECK_N == 0){
+    if(*param->current_iter % ITERATION_CHECK_N != 0) { return true; }
 
-        lr_calculateNorm(error, mse_aux);
+    //Calculate the mse of this iteration
+    lr_norm(error, mse_aux);
 
-        return lr_compare_mse(error, mse, mse_aux, hiperparam);
+    //Check for a bounce in GPU space
+    lr_check_bounce(mse, mse_aux, param, bounce); 
 
-    }else{
-        return true;
-    }
+    return *bounce;
+    
+    // //If we detect a bounce back, we modify the learning rate
+    // if (
+    //     (*mse < *mse_aux) &&
+    //     (*param->current_iter != ITERATION_CHECK_N) //For not reducing the learning rate at the beggining
+    // ){
+    //     *param->alpha *= LEARNING_RATE_REDUCTION; //Reduce the learning rate
+
+    //     if(*param->alpha <= MINIMUM_LEARNING_RATE) {return false;}
+
+    //     std::cout << "Se ha cambiado la tasa de aprendizaje en la " 
+    //               << *param->current_iter << " iteracion. Alpha = "
+    //               << *param->alpha << std::endl;
+    // }
+
+    // //We swap the values
+    // *mse = *mse_aux;
+
+    // //We check if the tolerance is met
+    // if(*mse <= param->tol){
+    //     std::cout << "Se ha alcanzado la tolerancia esperada a las " 
+    //               << *param->current_iter 
+    //               << " iteraciones\n" 
+    //               << std::endl;
+    //     return false;
+    // }
+
+    // return true;
 }
 
 
 //Encapsulates the launch of a kernel that calculates the euclidean norm of an horizontal or vertical vector
-__host__ void lr_calculateNorm(tensor* error, float* mse_aux){
+__host__ void lr_norm(tensor* error, float* mse_aux){
         int size;
 
         //We calculate wether the vector is a row or a column
@@ -192,63 +222,18 @@ __host__ void lr_calculateNorm(tensor* error, float* mse_aux){
 
         //We launch the kernel
         cudaMemsetAsync(mse_aux, 0, sizeof(float));
-        lr_norm<<<numBlocks, numThreads, sharedMem>>>(error->data_d, mse_aux, size);
+        lr_kernel_norm<<<numBlocks, numThreads, sharedMem>>>(error->data_d, mse_aux, size);
 
         //We check for silent errors during the kernel launch
-        cudaError_t err = cudaGetLastError();
-        if(err != cudaSuccess){
-            std::cout << "Error launching the error kernel. Error string -> " << cudaGetErrorString(err) << std::endl;
-            exit(EXIT_FAILURE);
-        }
+        CUDA_CHECK(cudaGetLastError(), "Lunching the kernels of calculations of norms");
 
-        //err = cudaDeviceSynchronize();
-        if(err != cudaSuccess){
-            std::cout << "Error synchronizing the device. Error string -> " << cudaGetErrorString(err) << std::endl;
-            exit(EXIT_FAILURE);
-        }
-}
-
-
-//Identifies if we had a bouncce back
-__host__ bool lr_compare_mse(tensor* error, float* mse, float* mse_aux, lr_hiperparameters* param){
-    
-    if(*param->current_iter % ITERATION_CHECK_N != 0) { return true; }
-
-    //Calculate the mse of this iteration
-    lr_calculateNorm(error, mse_aux);
-    
-    //If we detect a bounce back, we modify the learning rate
-    if (
-        (*mse < *mse_aux) &&
-        (*param->current_iter != ITERATION_CHECK_N) //For not reducing the learning rate at the beggining
-    ){
-        *param->alpha *= LEARNING_RATE_REDUCTION; //Reduce the learning rate
-
-        if(*param->alpha <= MINIMUM_LEARNING_RATE) {return false;}
-
-        std::cout << "Se ha cambiado la tasa de aprendizaje en la " 
-                  << *param->current_iter << " iteracion. Alpha = "
-                  << *param->alpha << std::endl;
-    }
-
-    //We swap the values
-    *mse = *mse_aux;
-
-    //We check if the tolerance is met
-    if(*mse <= param->tol){
-        std::cout << "Se ha alcanzado la tolerancia esperada a las " 
-                  << *param->current_iter 
-                  << " iteraciones\n" 
-                  << std::endl;
-        return false;
-    }
-
-    return true;
+        //We syncronize de device
+        //CUDA_CHECK(cudaDeviceSynchronize(), "Device syncronization"); 
 }
 
 
 //Performs the euclidean norm of a vactor in GPU
-__global__ void lr_norm(float* data, float* value, int size){
+__global__ void lr_kernel_norm(float* data, float* value, int size){
     
     extern __shared__ float buffer[];
 
@@ -271,4 +256,56 @@ __global__ void lr_norm(float* data, float* value, int size){
 
     //We add the result of each block into a variable
     if(tdx == 0) { atomicAdd(value, buffer[0]); }
+}
+
+
+//We check wether we had a bounce back
+__host__ void lr_check_bounce(float* mse, float* mse_aux, lr_hiperparameters* param, bool* bounce){
+
+        //Some parameters to launch the kernel
+        dim3 numThreads = {1, 1, 1};
+        dim3 numBlocks  = {1, 1, 1};
+
+        //We launch the kernel
+        lr_kernel_check_bounce<<<numBlocks, numThreads>>>(mse, mse_aux, param, bounce);
+
+        //We check for silent errors during the kernel launch
+        CUDA_CHECK(cudaGetLastError(), "Lunching the kernel of calculations of the bounce back");
+
+        //We syncronize de device
+        CUDA_CHECK(cudaDeviceSynchronize(), "Device syncronization"); 
+}
+
+
+//We check wether we had a bounce back
+__global__ void lr_kernel_check_bounce(float* mse, float* mse_aux, lr_hiperparameters* param, bool* bounce){
+
+    //If we detect a bounce back, we modify the learning rate
+    if (
+        (*mse < *mse_aux) &&
+        (*param->current_iter != param->first_iteration) //For not reducing the learning rate at the beggining
+    ){
+        *param->alpha *= param->alpha_reduction; //Reduce the learning rate
+
+        if(*param->alpha <= param->alpha_min) {*bounce = false;}
+
+        // std::cout << "Se ha cambiado la tasa de aprendizaje en la " 
+        //           << *param->current_iter << " iteracion. Alpha = "
+        //           << *param->alpha << std::endl;
+    }
+
+    //We swap the values
+    *mse = *mse_aux;
+
+    //We check if the tolerance is met
+    if(*mse <= param->tol){
+        // std::cout << "Se ha alcanzado la tolerancia esperada a las " 
+        //           << *param->current_iter 
+        //           << " iteraciones\n" 
+        //           << std::endl;
+        *bounce = false;
+    }
+
+    *bounce = true;    
+
 }

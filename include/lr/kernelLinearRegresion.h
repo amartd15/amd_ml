@@ -26,19 +26,22 @@ __host__ void linearRregresionKernel(
 
 //-------------------------------------------------- CHECK TOLERANCES -------------------------------------------//
 
-//Every 10 iterations we check if the tolerance is met, if we detect a bounce back
-//We reduce a 90% the learning rate, until it reches 1e-10
-__host__ bool lr_checkError(tensor* error, float* mse, float* mse_aux, lr_hiperparameters* param);
+//Identifies if we had a bouncce back
+__host__ bool lr_compare_mse(tensor* error, float* mse, float* mse_aux, lr_hiperparameters* param, bool* bounce);
 
 
 //Encapsulates the launch of a kernel that calculates the euclidean norm of an horizontal or vertical vector
-__host__ void lr_calculateNorm(tensor* error, float* mse_aux);
-
-
-//Identifies if we had a bouncce back
-__host__ bool lr_compare_mse(tensor* error, float* mse, float* mse_aux, lr_hiperparameters* hiperparam);
+__host__ void lr_norm(tensor* error, float* mse_aux);
 
 
 //Performs the euclidean norm of a vactor in GPU
-__global__ void lr_norm(float* data, float* value, int size);
+__global__ void lr_kernel_norm(float* data, float* value, int size);
+
+
+//We check wether we had a bounce back
+__host__ void lr_check_bounce(float* mse, float* mse_aux, lr_hiperparameters* param, bool* bounce);
+
+
+//We check wether we had a bounce back
+__global__ void lr_kernel_check_bounce(float* mse, float* mse_aux, lr_hiperparameters* param, bool* bounce);
 

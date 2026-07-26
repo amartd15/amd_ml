@@ -2,6 +2,7 @@
 
 #include <cuda_runtime.h>
 #include <iostream>
+#include <stdio.h>
 
 // For handling matrices with device and host memory
 struct tensor{
@@ -48,4 +49,11 @@ struct amd_linear_regression{
 enum direction{
     HOST_TO_DEVICE,
     DEVICE_TO_HOST
+};
+
+void inline CUDA_CHECK(cudaError_t err, std::string msg){
+    if(err != cudaSuccess){
+        std::cout << "Error-> " << msg << "\nCuda error-> " << cudaGetErrorString(err) << std::endl;
+        exit(EXIT_FAILURE);
+    }
 };
