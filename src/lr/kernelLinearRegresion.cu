@@ -26,6 +26,7 @@ __global__ void lr_gradientDescent(
 
         float h = 0.0f;
 
+        #pragma unroll
         for(int k = 0; k < n_param; ++k){
             h += d_X[idx * n_param + k] * param[k];
         }
@@ -42,6 +43,7 @@ __global__ void lr_gradientDescent(
         __syncthreads();
 
         //An algorithm to add all the elemtns of an array
+        #pragma unroll
         for(int j = blockDim.x / 2; j > 0; j >>= 1){
             if(tdx < j){
                 buffer[tdx] += buffer[tdx + j];
@@ -56,6 +58,8 @@ __global__ void lr_gradientDescent(
     }
 }
 
+
+//Updates de parameters in a different kernel
 __global__ void lr_update_param(float* param, float* grad, float *alpha, int n_points, int n_param){
 
     int idx = threadIdx.x + blockDim.x * blockIdx.x;
@@ -78,15 +82,16 @@ __host__ void linearRregresionKernel(
     int length = (n_param < n_points) ? n_points : n_param;
 
     //We define the variables needed for launching the kernel
-    dim3 numThreads, numBlocks, numBlocksParam;;
+    dim3 numThreads, numBlocks, numBlocksParam;
 
-    numThreads = {128, 1, 1}; //After some benchmarks the best result is given with 128 - 256 threads per block
-    numBlocks = {(int) (length + numThreads.x - 1) / numThreads.x, 1, 1};
-    numBlocksParam = {(int) (n_param + numThreads.x - 1) / numThreads.x, 1, 1};
+    numThreads      = {128,                                                 1, 1}; //After some benchmarks the best result is given with 128 - 256 threads per block
+    numBlocks       = {(int) (length + numThreads.x - 1) / numThreads.x,    1, 1};
+    numBlocksParam  = {(int) (n_param + numThreads.x - 1) / numThreads.x,   1, 1};
 
     //We define the shared memory we will be using
     int shared_mem = numThreads.x * sizeof(float);
 
+    //An iteration counter
     int iter = 0;
 
     //We create shared variables
@@ -98,8 +103,6 @@ __host__ void linearRregresionKernel(
     float* smse_aux         = createSharedPointer(aux2);
     float* slearning_rate   = createSharedPointer(learning_rate); 
     bool*  sbounce          = createSharedPointer(aux3);
-
-    std::cout << "Learning rate-> " << *slearning_rate << std::endl;
 
     //We create the structure with the hiperparameters
     lr_hiperparameters* hiperparameters = (lr_hiperparameters*)malloc(sizeof(lr_hiperparameters));
@@ -116,22 +119,35 @@ __host__ void linearRregresionKernel(
     //The main loop of the algorithm
     do{
         //Reset the gradent
-        cudaMemsetAsync(gradient->data_d, 0, n_param * sizeof(float));
+        cudaMemsetAsync(
+            gradient->data_d, 
+            0, 
+            n_param * sizeof(float)
+        );
 
         //Calculate the gradent
         lr_gradientDescent <<<numBlocks, numThreads, shared_mem>>>(
-            X->data_d, y->data_d,
-            parameters->data_d, gradient->data_d, error->data_d,
-            n_points, n_param, slearning_rate
+            X->data_d, 
+            y->data_d,
+            parameters->data_d, 
+            gradient->data_d, 
+            error->data_d,
+            n_points, 
+            n_param, 
+            slearning_rate
         );
 
         //Update the parameters
         lr_update_param <<<numBlocksParam, numThreads>>>(
-            parameters->data_d, gradient->data_d, slearning_rate, n_points, n_param
+            parameters->data_d, 
+            gradient->data_d, 
+            slearning_rate, 
+            n_points, 
+            n_param
         );
 
     }while(
-        (++iter < n_iter) &&
+        (++iter < n_iter)                                                   &&
         (lr_compare_mse(error, smse, smse_aux, hiperparameters, sbounce))    
     );
 
@@ -203,32 +219,32 @@ __host__ bool lr_compare_mse(tensor* error, float* mse, float* mse_aux, lr_hiper
 
 //Encapsulates the launch of a kernel that calculates the euclidean norm of an horizontal or vertical vector
 __host__ void lr_norm(tensor* error, float* mse_aux){
-        int size;
+    int size;
 
-        //We calculate wether the vector is a row or a column
-        if(min(error->rows, error->columns) == 1){
-            size = max(error->rows, error->columns);
-        }else{
-            std::cout << "Error, trying to calculate the norm of a matrix" << std::endl;
-            exit(EXIT_FAILURE);
-        }
+    //We calculate wether the vector is a row or a column
+    if(min(error->rows, error->columns) == 1){
+        size = max(error->rows, error->columns);
+    }else{
+        std::cout << "Error, trying to calculate the norm of a matrix" << std::endl;
+        exit(EXIT_FAILURE);
+    }
 
-        //Some parameters to launch the kernel
-        dim3 numThreads = {128, 1, 1};
-        dim3 numBlocks  = {(int) (size + numThreads.x -1) / numThreads.x, 1, 1};
+    //Some parameters to launch the kernel
+    dim3 numThreads = {128,                                             1, 1};
+    dim3 numBlocks  = {(int) (size + numThreads.x -1) / numThreads.x,   1, 1};
 
-        //Shared memory
-        int sharedMem = numThreads.x * sizeof(float);
+    //Shared memory
+    int sharedMem = numThreads.x * sizeof(float);
 
-        //We launch the kernel
-        cudaMemsetAsync(mse_aux, 0, sizeof(float));
-        lr_kernel_norm<<<numBlocks, numThreads, sharedMem>>>(error->data_d, mse_aux, size);
+    //We launch the kernel
+    cudaMemsetAsync(mse_aux, 0, sizeof(float));
+    lr_kernel_norm<<<numBlocks, numThreads, sharedMem>>>(error->data_d, mse_aux, size);
 
-        //We check for silent errors during the kernel launch
-        CUDA_CHECK(cudaGetLastError(), "Lunching the kernels of calculations of norms");
+    //We check for silent errors during the kernel launch
+    CUDA_CHECK(cudaGetLastError(), "Lunching the kernels of calculations of norms");
 
-        //We syncronize de device
-        //CUDA_CHECK(cudaDeviceSynchronize(), "Device syncronization"); 
+    //We syncronize de device
+    //CUDA_CHECK(cudaDeviceSynchronize(), "Device syncronization"); 
 }
 
 
