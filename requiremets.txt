@@ -1,0 +1,10 @@
+# Build-time dependency (needed by CMake to build the amd_ml_py module)
+pybind11>=2.11
+
+# Benchmarking / comparison against scikit-learn
+numpy>=1.26
+scikit-learn>=1.4
+matplotlib>=3.8
+
+# Optional: only needed to run Benchmarks/test.ipynb
+jupyter>=1.0

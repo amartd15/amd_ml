@@ -183,7 +183,7 @@ __host__ bool lr_compare_mse(tensor* error, float* mse, float* mse_aux, lr_hiper
     lr_norm(error, mse_aux);
 
     //Check for a bounce in GPU space
-    lr_check_bounce(mse, mse_aux, param, bounce); 
+    //lr_check_bounce(mse, mse_aux, param, bounce); 
 
     return *bounce;
     
