@@ -61,15 +61,10 @@ __host__ tensor* createTensor(float seed, int rows, int cols){
 
 //Allocates memory in RAM
 __host__ float* allocatePinnedMemory(size_t size){
-    cudaError_t err;
+    
     float* ptr;
 
-    err = cudaMallocHost((void**)&ptr, size);
-    if(err != cudaSuccess){
-        std::cout << "An error ocurred allocating pinned memory. " << cudaGetErrorString(err) << std::endl;
-        exit(EXIT_FAILURE);
-        
-    }
+    CUDA_CHECK(cudaMallocHost((void**)&ptr, size), "Allocating pinned memory");
 
     return ptr;
 };
@@ -77,15 +72,10 @@ __host__ float* allocatePinnedMemory(size_t size){
 
 //Allocates mamory in VRAM (GPU)
 __host__ float* allocateDeviceMemory(size_t size){
-    cudaError_t err;
+    
     float* ptr;
 
-    err = cudaMalloc((void**)&ptr, size);
-    if(err != cudaSuccess){
-        std::cout << "Error allocating device memory. " << cudaGetErrorString(err) << std::endl;
-        exit(EXIT_FAILURE);
-
-    }
+    CUDA_CHECK(cudaMalloc((void**)&ptr, size), "Allocating device memory");
 
     return ptr;
 };
@@ -93,24 +83,14 @@ __host__ float* allocateDeviceMemory(size_t size){
 
 //Copy memory in any given direction between RAM and VRAM
 __host__ void copyMemory(tensor* data, direction direction){
-    cudaError_t err;
+
     size_t size = data->rows * data->columns * sizeof(float);
 
     if(direction == HOST_TO_DEVICE){
-        err = cudaMemcpy(data->data_d, data->data_h, size, cudaMemcpyHostToDevice);
-        if(err != cudaSuccess){
-            std::cout << "Error copying memory from host to device. " << cudaGetErrorString(err) << std::endl;
-            exit(EXIT_FAILURE);
-
-        }
+        CUDA_CHECK(cudaMemcpy(data->data_d, data->data_h, size, cudaMemcpyHostToDevice), "Copying memory from hot to device");
 
     }else{
-        err = cudaMemcpy(data->data_h, data->data_d, size, cudaMemcpyDeviceToHost);
-        if(err != cudaSuccess){
-            std::cout << "Error copying memory from device to host. " << cudaGetErrorString(err) << std::endl;
-            exit(EXIT_FAILURE);
-
-        }
+        CUDA_CHECK(cudaMemcpy(data->data_h, data->data_d, size, cudaMemcpyDeviceToHost), "Copying memory form device to host");
 
     }
 };
@@ -118,21 +98,21 @@ __host__ void copyMemory(tensor* data, direction direction){
 
 //Free memory from both RAM and VRAM
 __host__ void freeTensor(tensor* data){
-    cudaError_t err;
 
-    err = cudaFree(data->data_d);
-    if(err != cudaSuccess){
-        std::cout << "Error freeing device memory from the tensor. " << cudaGetErrorString(err) << std::endl;
-        exit(EXIT_FAILURE); 
+    CUDA_CHECK(cudaFree(data->data_d), "Free device memory from tensor");
 
-    }
+    CUDA_CHECK(cudaFree(data->data_h), "Free host memory from tensor");
 
-    err = cudaFreeHost(data->data_h);
-    if(err != cudaSuccess){
-        std::cout << "Error freeing host memory from the tensor. " << cudaGetErrorString(err) << std::endl;
-        exit(EXIT_FAILURE); 
+    free(data);
+};
 
-    }
+
+//Free memory from both RAM and VRAM
+__host__ void freeTensor(tensor* data, std::string msg){
+
+    CUDA_CHECK(cudaFree(data->data_d), msg);
+
+    CUDA_CHECK(cudaFree(data->data_h), msg);
 
     free(data);
 };
@@ -140,31 +120,20 @@ __host__ void freeTensor(tensor* data){
 
 //Free memory only from device, and free the structure
 __host__ void freeTensor(tensor* data, bias decision){
-    cudaError_t err;
 
-    err = cudaFree(data->data_d);
-    if(err != cudaSuccess){
-        std::cout << "Error freeing memory from the tensor. " << cudaGetErrorString(err) << std::endl;
-        exit(EXIT_FAILURE); 
-
-    }
-
-    //If we are taking pointers of python, we dont have to get rid of the host memory
-
-    // if(decision == NO_BIAS){
-    //     free(data->data_h);
-
-    // }else{
-    //     err = cudaFreeHost(data->data_h);
-    //     if(err != cudaSuccess){
-    //         std::cout << "Error freeing pinned memory from the tensor. " << cudaGetErrorString(err) << std::endl;
-    //         exit(EXIT_FAILURE); 
-
-    //     }
-    // }
+    CUDA_CHECK(cudaFree(data->data_d), "Free device memroy from tensor");
 
     free(data);
 };
+
+
+//Free memory only from device, and free the structure
+__host__ void freeTensor(tensor* data, bias decision, std::string msg){
+
+    CUDA_CHECK(cudaFree(data->data_d), msg);
+
+    free(data);
+}
 
 
 //In case of the points matrix, we preparate the tensor wether we want bias or not
@@ -175,8 +144,8 @@ __host__ tensor* preparePointsTenstor(float* point_matrix, int n_parameters, int
 
     //We prepare the data, taking into acount if the user wants a bias
     if(decision == YES_BIAS){
+
         //Create an auxiliary array for the matrix with bias
-        //float* point_matrix_bias = (float*)malloc((n_parameters+1) * n_points * sizeof(float));
         float* point_matrix_bias = allocatePinnedMemory((n_parameters+1) * n_points * sizeof(float));
 
         //We copy the array to a new one with a the first column of 1's (bias) 
@@ -202,21 +171,17 @@ __host__ tensor* preparePointsTenstor(float* point_matrix, int n_parameters, int
 
 //We clean up all the variables created in the program
 __host__ void cleanContext(amd_linear_regression context){
-    freeTensor(context.error);
-    freeTensor(context.parameters);
-    freeTensor(context.gradient);
-    freeTensor(context.result_matrix, context.decision);
-    freeTensor(context.point_matrix, context.decision);
-    //freeTensor(context.mse);
+    freeTensor(context.error, "Free error tensor");
+    freeTensor(context.parameters, "Free parameter tensor");
+    freeTensor(context.gradient, "Free gradent tensor");
+    freeTensor(context.result_matrix, context.decision, "Free X tensor");
+    freeTensor(context.point_matrix, context.decision, "Free y tensor");
+
+    free(context.hiperparameters);
 }
 
 
 //Good practice to clean up the device
 __host__ void cleanUpDevice(){
-    cudaError_t err = cudaDeviceReset();
-    if (err != cudaSuccess){
-        printf("--------------------Failed to deinitialize the device. Error: %s", cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
-
+    CUDA_CHECK(cudaDeviceReset(), "Resetting the device");
 }

@@ -14,7 +14,9 @@ __global__ void StocasticGradientDescent(
     const float* d_X, 
     const float* d_y, 
     float* param,
-    int n_points, int n_param, float learning_rate
+    int n_points, 
+    int n_param, 
+    float learning_rate
 ){
 
     int idx = threadIdx.x + blockDim.x * blockIdx.x;
@@ -47,26 +49,31 @@ __global__ void StocasticGradientDescent(
 
 //This function encapsulates the process of launching the kernel of the SGD linear regression.
 //Only brings back to host memory the parameters matrix, the rest is kept in device memory
-__host__ void SGDlinearRregresionKernel(
-    tensor* X, tensor* y, tensor* parameters, tensor* error,
-    unsigned int n_param, unsigned int n_points, unsigned int n_iter, 
-    float learning_rate, float desired_tol
+__host__ amd_linear_regression SGDlinearRregresionKernel(
+    tensor*             X, 
+    tensor*             y, 
+    tensor*             parameters, 
+    tensor*             error,
+    
+    lr_hiperparameters* hp //Short for hiperparameters
 ){
 
     //We check wether there are more parameters or points in the dataset
-    int length = (n_param < n_points) ? n_points : n_param;
+    int length = (hp->n_param < hp->n_points) ? hp->n_points : hp->n_param;
 
     //We define the variables needed for launching the kernel
-    dim3 numThreads, numBlocks, numBlocksError;
+    dim3 numThreads, numBlocks;
 
-    numThreads = {128, 1, 1}; //After some benchmarks the best result is given with 128 - 256 threads per block
-    numBlocks = {(int) (length + numThreads.x - 1) / numThreads.x, 1, 1};
+    numThreads      = {64,                                                      1, 1}; //After some benchmarks the best result is given with 64 - 256 threads per block
+    numBlocks       = {(int) (length + numThreads.x - 1) / numThreads.x,        1, 1};
 
-    numBlocksError = {(int) (n_param + numThreads.x - 1) / numThreads.x, 1, 1};
-
+    //An iteration counter
     int iter = 0;
-    tensor* mse = createTensor(0.0f, 1, 1); //For tracking if the model bounces back
+    hp->current_iter = &iter;
 
+    //We create the control variables
+    float mse = 0.0f; //To store each iteration the mse
+    float* smse_aux = createSharedPointer(0.0f); //To calculate each iteration the mse
 
     //The main loop of the algorithm
     do{
@@ -74,37 +81,55 @@ __host__ void SGDlinearRregresionKernel(
                 X->data_d, 
                 y->data_d,
                 parameters->data_d,
-                n_points, n_param, learning_rate
-            );
-
-            SGD_calculateError<<<numBlocksError, numThreads>>>(
-                X->data_d,
-                y->data_d,
-                parameters->data_d,
-                error->data_d,
-                n_points,
-                n_param
+                hp->n_points, 
+                hp->n_param, 
+                *hp->alpha
             );
 
     }while(
-        (++iter < n_iter) &&
-        (SGD_checkError(iter, desired_tol, mse, &learning_rate, error))    
-    );
-
-    cudaDeviceSynchronize();
+        (++iter < hp->iter)                                           &&
+        
+        (
+        SGD_compare_mse(
+            X,
+            y,
+            parameters,
+            error,
+            &mse, 
+            smse_aux,
+            hp
+        )
+        )//Second conditional   
+    );//while
 
     //We check for silent errors
-    cudaError_t err = cudaGetLastError();
-    if(err != cudaSuccess){
-        std::cout << "Error during the kernel launch. Error message -> " << cudaGetErrorString(err) << std::endl;
-        exit(EXIT_FAILURE);
-    }
+    CUDA_CHECK(cudaGetLastError(), "Launching the kernels of the linear regression");
+
+    //We syncronize de device
+    CUDA_CHECK(cudaDeviceSynchronize(), "Device syncronization");  
 
     //We bring back only the parameters
     copyMemory(parameters, DEVICE_TO_HOST);
 
-    //We free the pointer used for tracking the mse
-    freeTensor(mse);
+    //Free shared pointers
+    CUDA_CHECK(cudaFree(smse_aux), "Free smse_aux");
+
+    //We get the mse
+    hp->mse                          = mse;
+
+    //We create and fill the structure of the function
+    amd_linear_regression context;
+
+    context.point_matrix             = X;
+    context.result_matrix            = y;
+
+    context.parameters               = parameters;
+    context.error                    = error;
+    context.gradient                 = createTensor(1, 1); //Empty
+    
+    context.hiperparameters          = hp;
+
+    return context;
 }
 
 
@@ -112,12 +137,13 @@ __host__ void SGDlinearRregresionKernel(
 
 
 //We calculate the error with our current model with the dataset
-__global__ void SGD_calculateError(
+__global__ void SGD_calculateError_kernel(
     const float* d_X,
     const float* d_y,
     const float* param,
     float* error,
-    int n_points, int n_param
+    int n_points, 
+    int n_param
 ){
     int idx = threadIdx.x + blockDim.x * blockIdx.x;
 
@@ -138,94 +164,137 @@ __global__ void SGD_calculateError(
 
 //Every ITERATION_CHECK_N iterations we check if the tolerance is met, if we detect a bounce back
 //We reduce by LEARNING_RATE_REDUCTION the learning rate, until it reches MINIMUM_LEARNING_RATE
-__host__ bool SGD_checkError(int iter, float desired_tol, tensor* mse, float* alpha, tensor* error){
+__host__ bool SGD_compare_mse(
+    tensor* d_X,
+    tensor* d_y,
+    tensor* param,
+    tensor* error, 
+    float* mse, 
+    float* mse_aux, 
+    lr_hiperparameters* hp
+){
     
-    if(iter % ITERATION_CHECK_N == 0){
+    if(*hp->current_iter % hp->first_iteration != 0) { return true; }
 
-        //We use an auxiliary variable to compare with the value of the previous iteration so that
-        //we can catch when the gradent "bounces" back
+    //Calculate the error for this iteration
+    SGD_calculateError(
+        d_X,
+        d_y,
+        param,
+        error,
 
-        float mse_aux = SGD_calculateNorm(error);
+        hp
+    );
 
-        //If we detect a bounce back, we modify the learning rate
-        if (
-            (*mse->data_h < mse_aux) &&
-            (iter != ITERATION_CHECK_N) //For not reducing the learning rate at the beggining
-        ){
-            *alpha *= LEARNING_RATE_REDUCTION; //Reduce the learning rate
+    //Calculate the mse of this iteration
+    SGD_norm(error, mse_aux);
 
-            if(*alpha <= MINIMUM_LEARNING_RATE) {return false;}
+    //Bring back the result
+    CUDA_CHECK(cudaDeviceSynchronize(), "Syncronizing");
+    
+    //If we detect a bounce back, we modify the learning rate
+    if (
+        (*mse < *mse_aux) &&
+        (*hp->current_iter != hp->first_iteration) //For not reducing the learning rate at the beggining
+    ){
+        *hp->alpha *= hp->alpha_reduction; //Reduce the learning rate
 
-            std::cout << "Se ha cambiado la tasa de aprendizaje en la " << iter << " iteracion. Alpha = "<< *alpha << std::endl;
-        }
+        if(*hp->alpha <= hp->alpha_min) {return false;}
 
-        //We swap the values
-        *mse->data_h = mse_aux;
-
-        //We check if the tolerance is met
-        if(*mse->data_h <= desired_tol){
-            std::cout << "Se ha alcanzado la tolerancia esperada a los " << iter << " barridos\n" << std::endl;
-            return false;
-        }
-
-        return true;
-
-    }else{
-        return true;
+        std::cout << "Se ha cambiado la tasa de aprendizaje en la " 
+                  << *hp->current_iter << " iteracion. Alpha = "
+                  << *hp->alpha << std::endl;
     }
+
+    //We swap the values
+    *mse = *mse_aux;
+
+    //We check if the tolerance is met
+    if(*mse <= hp->tol){
+        std::cout << "Se ha alcanzado la tolerancia esperada a las " 
+                  << *hp->current_iter 
+                  << " iteraciones\n" 
+                  << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
+
+__host__ void SGD_calculateError(    
+    tensor* d_X,
+    tensor* d_y,
+    tensor* param,
+    tensor* error,
+    
+    lr_hiperparameters* hp
+){
+
+    //Some parameters to launch the kernel
+    dim3 numThreads      = {128,                                                     1, 1};
+    dim3 numBlocks       = {(int) (hp->n_param + numThreads.x - 1) / numThreads.x,   1, 1};
+
+    
+    SGD_calculateError_kernel<<<numBlocks, numThreads>>>(
+    d_X->data_d,
+    d_y->data_d,
+    param->data_d,
+    error->data_d,
+    hp->n_points,
+    hp->n_param
+    );
+
+    //We check for silent errors during the kernel launch
+    CUDA_CHECK(cudaGetLastError(), "Lunching the kernels of calculations of norms");
 }
 
 
 //Encapsulates the launch of a kernel that calculates the euclidean norm of an horizontal or vertical vector
-__host__ float SGD_calculateNorm(tensor* vector){
-
-    //An auxiliary variable initalized with 0 values
-    tensor* mse_squared = createTensor(0.0f, 1, 1);
-
+__host__ void SGD_norm(
+    tensor* error, 
+    float* mse_aux
+){
     int size;
 
     //We calculate wether the vector is a row or a column
-    if(min(vector->rows, vector->columns) == 1){
-        size = max(vector->rows, vector->columns);
+    if(min(error->rows, error->columns) == 1){
+        size = max(error->rows, error->columns);
     }else{
         std::cout << "Error, trying to calculate the norm of a matrix" << std::endl;
+        exit(EXIT_FAILURE);
     }
 
     //Some parameters to launch the kernel
-    dim3 numThreads = {128, 1, 1};
-    dim3 numBlocks  = {(int) (size + numThreads.x -1) / numThreads.x, 1, 1};
+    dim3 numThreads = {128,                                             1, 1};
+    dim3 numBlocks  = {(int) (size + numThreads.x -1) / numThreads.x,   1, 1};
 
     //Shared memory
     int sharedMem = numThreads.x * sizeof(float);
 
     //We launch the kernel
-    SGD_norm<<<numBlocks, numThreads, sharedMem>>>(vector->data_d, mse_squared->data_d, size);
+    cudaMemsetAsync(mse_aux, 0, sizeof(float));
+    
+    SGD_kernel_norm<<<numBlocks, numThreads, sharedMem>>>(error->data_d, mse_aux, size);
 
     //We check for silent errors during the kernel launch
-    cudaError_t err = cudaGetLastError();
-    if(err != cudaSuccess){
-        std::cout << "Error launching the error kernel" << std::endl;
-        exit(EXIT_FAILURE);
-    }
-
-    //Bring back the mse squared to host memory and storeing it on a variable
-    copyMemory(mse_squared, DEVICE_TO_HOST);
-    float value = *mse_squared->data_h;
-
-    //To avoid memory leaks (on each iteration allocate memory and not cleaning it)
-    freeTensor(mse_squared);
-
-    return sqrt(value);
+    CUDA_CHECK(cudaGetLastError(), "Lunching the kernels of calculations of norms");
 }
 
 
 //Performs the euclidean norm of a vactor in GPU
-__global__ void SGD_norm(float* data, float* value, int size){
+__global__ void SGD_kernel_norm(
+    float* data, 
+    float* value, 
+    int size
+){
     
     extern __shared__ float buffer[];
 
     int idx = threadIdx.x + blockDim.x * blockIdx.x;
     int tdx = threadIdx.x;
+
+    if(idx == 0) { *value = 0; } //Reset the value to 0, the operation is so fast no race conditions should be possible
 
     //We fill the shared memory with each element of the error squared
     buffer[tdx] = (idx < size) ? data[idx] * data[idx] : 0.0f;

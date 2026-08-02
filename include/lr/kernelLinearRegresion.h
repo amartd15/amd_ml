@@ -27,17 +27,14 @@ __global__ void lr_update_param(
 
 //This function encapsulates the process of launching the kernel of the linear regression.
 //Only brings back to host memory the parameters matrix, the rest is kept in device memory
-__host__ void linearRregresionKernel(
-    tensor* X, 
-    tensor* y, 
-    tensor* parameters, 
-    tensor* gradient, 
-    tensor* error,
-    unsigned int n_param, 
-    unsigned int n_points, 
-    unsigned int n_iter, 
-    float learning_rate, 
-    float desired_tol
+__host__ amd_linear_regression linearRregresionKernel(
+    tensor*             X, 
+    tensor*             y, 
+    tensor*             parameters, 
+    tensor*             gradient, 
+    tensor*             error,
+    
+    lr_hiperparameters* hp //Short for hiperparameters
 );
 
 

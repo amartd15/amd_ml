@@ -28,6 +28,7 @@ __host__ float* allocateDeviceMemory(size_t size);
 __host__ void copyMemory(tensor* data, direction direction);
 
 __host__ void freeTensor(tensor* data);
+__host__ void freeTensor(tensor* data, std::string msg);
 __host__ void freeTensor(tensor* data, bias decision);
 
 __host__ tensor* preparePointsTenstor(float* point_matrix, int n_parameters, int n_points, bias decision);

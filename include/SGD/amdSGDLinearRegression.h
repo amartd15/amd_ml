@@ -16,9 +16,17 @@ extern "C" {
 // It has the ability to add a bias (independent term) to the data set if needed
 // The context shall be cleared with cleanContext()
 __host__ amd_linear_regression SGD_linear_regression(
-    float* point_matrix, float* result_matrix,
-    unsigned int n_points, unsigned int n_parameters, unsigned int n_iter,
-    float desired_tolerance, float initial_seed, float learning_rate,
+    float* point_matrix, 
+    float* result_matrix,
+
+    unsigned int n_points, 
+    unsigned int n_parameters, 
+    unsigned int n_iter,
+
+    float desired_tolerance, 
+    float initial_seed, 
+    float learning_rate,
+
     bias decision
 );
 
