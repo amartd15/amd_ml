@@ -273,7 +273,7 @@ __host__ void SGD_norm(
     int sharedMem = numThreads.x * sizeof(float);
 
     //We launch the kernel
-    cudaMemsetAsync(mse_aux, 0, sizeof(float));
+    cudaMemset(mse_aux, 0, sizeof(float));
     
     SGD_kernel_norm<<<numBlocks, numThreads, sharedMem>>>(error->data_d, mse_aux, size);
 

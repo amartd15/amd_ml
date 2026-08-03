@@ -58,8 +58,6 @@ struct amd_linear_regression{
     tensor*                 error;
     tensor*                 gradient;
 
-    bias                    decision;
-
     lr_hiperparameters*     hiperparameters;
 };
 

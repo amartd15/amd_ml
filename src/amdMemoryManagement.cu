@@ -101,7 +101,7 @@ __host__ void freeTensor(tensor* data){
 
     CUDA_CHECK(cudaFree(data->data_d), "Free device memory from tensor");
 
-    CUDA_CHECK(cudaFree(data->data_h), "Free host memory from tensor");
+    CUDA_CHECK(cudaFreeHost(data->data_h), "Free host memory from tensor");
 
     free(data);
 };
@@ -112,7 +112,7 @@ __host__ void freeTensor(tensor* data, std::string msg){
 
     CUDA_CHECK(cudaFree(data->data_d), msg);
 
-    CUDA_CHECK(cudaFree(data->data_h), msg);
+    CUDA_CHECK(cudaFreeHost(data->data_h), msg);
 
     free(data);
 };
@@ -123,7 +123,11 @@ __host__ void freeTensor(tensor* data, bias decision){
 
     CUDA_CHECK(cudaFree(data->data_d), "Free device memroy from tensor");
 
-    free(data);
+    if(decision == YES_BIAS){
+        CUDA_CHECK(cudaFreeHost(data->data_h), "Free pinned memory from tensor");
+    }else{
+        free(data);
+    }
 };
 
 
@@ -132,7 +136,11 @@ __host__ void freeTensor(tensor* data, bias decision, std::string msg){
 
     CUDA_CHECK(cudaFree(data->data_d), msg);
 
-    free(data);
+    if(decision == YES_BIAS){
+        CUDA_CHECK(cudaFreeHost(data->data_h), msg);
+    }else{
+        free(data);
+    }
 }
 
 
@@ -174,8 +182,8 @@ __host__ void cleanContext(amd_linear_regression context){
     freeTensor(context.error, "Free error tensor");
     freeTensor(context.parameters, "Free parameter tensor");
     freeTensor(context.gradient, "Free gradent tensor");
-    freeTensor(context.result_matrix, context.decision, "Free X tensor");
-    freeTensor(context.point_matrix, context.decision, "Free y tensor");
+    freeTensor(context.result_matrix, context.hiperparameters->decision, "Free X tensor");
+    freeTensor(context.point_matrix, context.hiperparameters->decision, "Free y tensor");
 
     free(context.hiperparameters);
 }
