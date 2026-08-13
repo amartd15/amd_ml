@@ -5,6 +5,7 @@
 __host__ tensor* createTensor(int rows, int cols);
 __host__ tensor* createTensor(float* data, int rows, int cols);
 __host__ tensor* createTensor(float seed, int rows, int cols);
+__host__ tensor* BTCHcreateTensor_y(float* data, int n_points, int BTCH);
 
 //Create a unique pointer to a variable in GPU
 template<typename T>
@@ -32,6 +33,7 @@ __host__ void freeTensor(tensor* data, std::string msg);
 __host__ void freeTensor(tensor* data, bias decision);
 
 __host__ tensor* preparePointsTenstor(float* point_matrix, int n_parameters, int n_points, bias decision);
+__host__ tensor* BTCHpreparePointsTenstor(float* point_matrix, int n_parameters, int n_points, bias decision, int BTCH)
 
 __host__ void cleanContext(amd_linear_regression context);
 __host__ void cleanUpDevice();

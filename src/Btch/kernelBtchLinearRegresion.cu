@@ -2,6 +2,8 @@
 #include "amdMemoryManagement.h"
 
 
+#define BTCH 1000
+
 //-------------------------------------------------- GRADENT DESCENT -------------------------------------------//
 
 //Performs the calculation of the gradent in GPU
@@ -81,7 +83,7 @@ __global__ void lr_update_param(
 
 //This function encapsulates the process of launching the kernel of the linear regression.
 //Only brings back to host memory the parameters matrix, the rest is kept in device memory
-__host__ amd_linear_regression linearRregresionKernel(
+__host__ amd_linear_regression BTCHlinearRregresionKernel(
     tensor*             X, 
     tensor*             y, 
     tensor*             parameters, 
@@ -104,43 +106,73 @@ __host__ amd_linear_regression linearRregresionKernel(
     //We define the shared memory we will be using
     int shared_mem = numThreads.x * sizeof(float);
 
-    //An iteration counter
-    int iter = 0;
-    hp->current_iter = &iter;
+
 
     //We create the control variables
     float mse = 0.0f; //To store each iteration the mse
     float* smse_aux = createSharedPointer(0.0f); //To calculate each iteration the mse
 
+    //We create the streams:
+    //One will load memory, the other will perform the kernel
+    //Up to 7 streams
+
+    int n_streams = 7;
+
+    cudaStream_t stream[n_streams];
+
+    for(int i = 0; i < n_streams; ++i){
+        CUDA_CHECK(cudaStreamCreate(&stream[i]), "Creating stream");
+    }
+
+    //We copy the first time the data
+    cudaMemcpyAsync((void*) X->data_d, (const void*) X->data_h, BTCH * sizeof(float), cudaMemcpyHostToDevice, stream[0]);
+    cudaMemcpyAsync((void*) y->data_d, (const void*) y->data_h, BTCH * sizeof(float), cudaMemcpyHostToDevice, stream[0]);
+
+
+    //An iteration counter
+    int iter = 0;
+    hp->current_iter = &iter;
+
     //The main loop of the algorithm
     do{
+        int index1; //the stream index
+        int index2;
+
+        index1 = (n_streams - 1) - (iter)     % n_streams;
+        index2 = (n_streams - 1) - (iter + 1) % n_streams;
+
+        cudaMemcpyAsync((void*) X->data_d + iter*BTCH, (const void*) X->data_h, BTCH * hp->n_param * sizeof(float), cudaMemcpyHostToDevice, stream[index2]);
+        cudaMemcpyAsync((void*) y->data_d + iter*BTCH, (const void*) y->data_h, BTCH * sizeof(float), cudaMemcpyHostToDevice, stream[index2]);
 
         //Reset the gradent
-        cudaMemset(gradient->data_d, 0, hp->n_param * sizeof(float));
+        cudaMemsetAsync(gradient->data_d, 0, hp->n_param * sizeof(float), stream[index1]);
 
         //Calculate the gradent
-        lr_gradientDescent<<<numBlocks, numThreads, shared_mem>>>(
+        lr_gradientDescent<<<numBlocks, numThreads, shared_mem, stream[index1]>>>(
             X->data_d, 
             y->data_d,
             parameters->data_d, 
             gradient->data_d, 
             error->data_d,
-            hp->n_points, 
+            BTCH, 
             hp->n_param
         );
 
         //Update the parameters
-        lr_update_param<<<numBlocksParam, numThreads>>>(
+        lr_update_param<<<numBlocksParam, numThreads, 0, stream[index1]>>>(
             parameters->data_d, 
             gradient->data_d, 
             *hp->alpha, 
-            hp->n_points, 
+            BTCH, 
             hp->n_param
         );
 
+        cudaStreamSynchronize(stream[index1]);
+        cudaStreamSynchronize(stream[index2]);
+
     }while(
-        (++iter < hp->iter)                                                   &&
-        (lr_compare_mse(error, &mse, smse_aux, hp))
+        (++iter < hp->iter)                                                   /*&&
+        (lr_compare_mse(error, &mse, smse_aux, hp))*/
     );
 
     //We check for silent errors
@@ -154,6 +186,10 @@ __host__ amd_linear_regression linearRregresionKernel(
 
     //Free shared pointers
     CUDA_CHECK(cudaFree(smse_aux), "Free smse_aux");
+
+    for(int i = 0; i < n_streams; ++i){
+        CUDA_CHECK(cudaStreamDestroy(&stream[i]), "Destroying stream");
+    }
 
     //We get the mse
     hp->mse                          = mse;
@@ -171,9 +207,16 @@ __host__ amd_linear_regression linearRregresionKernel(
     context.hiperparameters          = hp;
 
     return context;
-}
+};
 
+void createIndex(int index1, int index2, int iter, int n_points, int n_streams){
+    int n_iteration_btch = (int) n_points / BTCH; //Assuming the number is divisible (if not the model is not trained with the last batch)
 
+    index1 = (n_streams - 1) - iter % n_streams;
+    index2 = index1 + 1;
+
+    if(index2 == (n_streams - 1)) { index2 = 0; }
+};
 //-------------------------------------------------- CHECK TOLERANCES -------------------------------------------//
 
 

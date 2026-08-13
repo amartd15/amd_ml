@@ -59,6 +59,25 @@ __host__ tensor* createTensor(float seed, int rows, int cols){
 };
 
 
+__host__ tensor* BTCHcreateTensor_y(float* data, int n_points, int BTCH){
+    tensor* created_tensor = (tensor*)malloc(sizeof(tensor));
+
+    created_tensor->columns = 1;
+    created_tensor->rows = n_points;
+
+    size_t size = BTCH * sizeof(float);
+
+    CUDA_CHECK(
+        cudaHostRegister((void*) data, n_points * sizeof(float), cudaHostRegisterDefault),
+        "Creating pinned memory"
+    );
+
+    created_tensor->data_h = data;
+
+    return created_tensor; 
+}
+
+
 //Allocates memory in RAM
 __host__ float* allocatePinnedMemory(size_t size){
     
@@ -171,6 +190,47 @@ __host__ tensor* preparePointsTenstor(float* point_matrix, int n_parameters, int
         matrix_points = createTensor(point_matrix_bias, n_points, n_parameters);
     }else{
         matrix_points = createTensor(point_matrix, n_points, n_parameters);
+    }
+
+    return matrix_points;
+}
+
+
+//For the batch descent
+__host__ tensor* BTCHpreparePointsTenstor(float* point_matrix, int n_parameters, int n_points, bias decision, int BTCH){
+
+    //We prepare the tensor for the points matrix
+    tensor* matrix_points;
+
+    //We prepare the data, taking into acount if the user wants a bias
+    if(decision == YES_BIAS){
+
+        //Create an auxiliary array for the matrix with bias
+        float* point_matrix_bias = allocatePinnedMemory((n_parameters+1) * n_points * sizeof(float));
+
+        //We copy the array to a new one with a the first column of 1's (bias) 
+        for(int i = 0; i < n_points; ++i){
+            point_matrix_bias[i * (n_parameters + 1)] = 1.0f;
+
+            for(int j = 0; j < n_parameters; ++j){
+                point_matrix_bias[(j+1) + i*(n_parameters + 1)] = point_matrix[j + i*n_parameters];
+            }
+        }
+
+        //We take into account we have one parameter more
+        ++n_parameters;
+
+        matrix_points = createTensor(BTCH, n_parameters);
+        matrix_points->data_h = point_matrix_bias;
+    }else{
+
+        CUDA_CHECK(
+            cudaHostRegister((void*) point_matrix, n_points * n_parameters * sizeof(float), cudaHostRegisterDefault),
+            "Creating pinned memory"
+        );
+
+        matrix_points = createTensor(BTCH, n_parameters);
+        matrix_points->data_h = point_matrix;
     }
 
     return matrix_points;
