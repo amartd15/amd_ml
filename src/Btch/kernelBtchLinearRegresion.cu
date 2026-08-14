@@ -3,7 +3,6 @@
 
 
 #define BTCH 1000
-
 //-------------------------------------------------- GRADENT DESCENT -------------------------------------------//
 
 //Performs the calculation of the gradent in GPU
@@ -111,15 +110,16 @@ __host__ amd_linear_regression BTCHlinearRregresionKernel(
     float* smse_aux = createSharedPointer(0.0f); //To calculate each iteration the mse
 
     //We create the streams:
-    //One will load memory, the other will perform the kernel
-    //Up to 7 streams
-
     int n_streams = 3;
     cudaStream_t stream[n_streams];
 
     for(int i = 0; i < n_streams; ++i){
         CUDA_CHECK(cudaStreamCreate(&stream[i]), "Creating stream");
     }
+
+    //We create an event
+    cudaEvent_t computation_done;
+    CUDA_CHECK(cudaEventCreate(&computation_done), "Creating event");
 
     //We copy the first time the data
     size_t offset = BTCH * sizeof(float);
@@ -148,86 +148,93 @@ __host__ amd_linear_regression BTCHlinearRregresionKernel(
 
 
     //An iteration counter
-    int chunk = 0;
-    hp->current_iter = &chunk;
+    //int chunk = 0;
+    //hp->current_iter = &chunk;
     int num_BTCH = (int) hp->n_points / BTCH;
 
     //The main loop of the algorithm. Encharged of processing chinks of data
-    do{
+    for(int iter = 0; iter < hp->iter; ++iter){
+        for(int chunk = 0; chunk < num_BTCH; ++chunk){
 
-        //We will use one stream to upload memory and one for launching the kernel
-        int stream_index_1 =  chunk      % n_streams;
-        int stream_index_2 = (chunk + 1) % n_streams;
+            //We will use one stream to upload memory and one for launching the kernel
+            int stream_index_1 =  chunk      % n_streams;
+            int stream_index_2 = (chunk + 1) % n_streams;
 
-        //For switching between the two buffers
-        int processed      = chunk       % 2;
-        int transferred    = (chunk + 1) % 2;
+            //For switching between the two buffers
+            int processed      = chunk       % 2;
+            int transferred    = (chunk + 1) % 2;
 
-        //Beware that it must be divisible or we are accessing ilegal memory adresses
-        //We start with an offset to start in 1 offset (the other was done outside)
-        int offset_index   = (chunk + num_BTCH + 1) % num_BTCH; 
+            //Beware that it must be divisible or we are accessing ilegal memory adresses
+            //We start with an offset to start in 1 offset (the other was done outside)
+            int offset_index   = (chunk + num_BTCH + 1) % num_BTCH; 
 
-        //---------------------Copying the data on one stream--------------------------//
-        
-        cudaMemcpyAsync(
-            //We skip different number of batches depending on the iteration
-            (void*) X->data_d[transferred],
+            //---------------------Copying the data on one stream--------------------------//
 
-            (void*) (X->data_h + 
-                offset_index * BTCH * hp->n_param), 
+            //For the last batch
+            if(chunk == num_BTCH - 1){
+                offset = hp->n_points - chunk*BTCH*sizeof(float);
+            };
 
-            //The fixed batch size
-            offset * hp->n_param, 
+            //The memory transfers
+            cudaMemcpyAsync(
+                //We skip different number of batches depending on the iteration
+                (void*) X->data_d[transferred],
 
-            cudaMemcpyHostToDevice, 
-            stream[stream_index_2]
-        );
+                (void*) (X->data_h + 
+                    offset_index * BTCH * hp->n_param), 
 
-        cudaMemcpyAsync(
-            (void*) y->data_d[transferred],
+                //The fixed batch size
+                offset * hp->n_param, 
 
-            (void*) (y->data_h + 
-                offset_index * BTCH), 
+                cudaMemcpyHostToDevice, 
+                stream[stream_index_2]
+            );
 
-            //Fixed offset
-            offset, 
+            cudaMemcpyAsync(
+                (void*) y->data_d[transferred],
 
-            cudaMemcpyHostToDevice, 
-            stream[stream_index_2]
-        );
+                (void*) (y->data_h + 
+                    offset_index * BTCH), 
 
-        //---------------------Copying the data on one stream--------------------------//
+                //Fixed offset
+                offset, 
 
-        //Reset the gradent
-        cudaMemsetAsync(gradient->data_d, 0, hp->n_param * sizeof(float), stream[stream_index_1]);
+                cudaMemcpyHostToDevice, 
+                stream[stream_index_2]
+            );
 
-        //Calculate the gradent
-        lr_gradientDescent<<<numBlocks, numThreads, shared_mem, stream[stream_index_1]>>>(
-            X->data_d[processed], 
-            y->data_d[processed],
-            parameters->data_d, 
-            gradient->data_d, 
-            error->data_d,
-            BTCH, 
-            hp->n_param
-        );
+            //---------------------Copying the data on one stream--------------------------//
 
-        //Update the parameters
-        lr_update_param<<<numBlocksParam, numThreads, 0, stream[stream_index_1]>>>(
-            parameters->data_d, 
-            gradient->data_d, 
-            *hp->alpha, 
-            BTCH, 
-            hp->n_param
-        );
+            //Reset the gradent
+            cudaMemsetAsync(gradient->data_d, 0, hp->n_param * sizeof(float), stream[stream_index_1]);
 
-        cudaStreamSynchronize(stream[stream_index_1]);
-        cudaStreamSynchronize(stream[stream_index_2]);
+            //Calculate the gradent
+            lr_gradientDescent<<<numBlocks, numThreads, shared_mem, stream[stream_index_1]>>>(
+                X->data_d[processed], 
+                y->data_d[processed],
+                parameters->data_d, 
+                gradient->data_d, 
+                error->data_d,
+                BTCH, 
+                hp->n_param
+            );
 
-    }while(
-        (++chunk < (hp->iter / BTCH))                                                   /*&&
-        (lr_compare_mse(error, &mse, smse_aux, hp))*/
-    );
+            //Update the parameters
+            lr_update_param<<<numBlocksParam, numThreads, 0, stream[stream_index_1]>>>(
+                parameters->data_d, 
+                gradient->data_d, 
+                *hp->alpha, 
+                BTCH, 
+                hp->n_param
+            );
+
+            cudaEventRecord(computation_done, stream[stream_index_1]);
+
+            cudaStreamWaitEvent(stream[stream_index_2], computation_done, 0);
+        }; //for(int chunk = 0; chunk < num_BTCH; ++chunk)
+
+    };//for(int iter = 0; iter < hp->iter; ++iter)
+    
 
     //We check for silent errors
     CUDA_CHECK(cudaGetLastError(), "Launching the kernels of the linear regression");
@@ -250,11 +257,17 @@ __host__ amd_linear_regression BTCHlinearRregresionKernel(
         CUDA_CHECK(cudaStreamDestroy(stream[i]), "Destroying stream");
     }
 
+    //DEleting the event
+    CUDA_CHECK(cudaEventDestroy(computation_done), "Destroying event");
+
     //We get the mse
     hp->mse                          = mse;
 
     //We create and fill the structure of the function
     amd_linear_regression context;
+
+    context.point_matrix             = (tensor*) malloc(sizeof(tensor));
+    context.result_matrix            = (tensor*) malloc(sizeof(tensor));
 
     //We "cast" the BTCH_tensor into tensors
     context.point_matrix->data_d     = X->data_d[0];

@@ -23,14 +23,14 @@ __host__ int main(){
     title("Creating parameters");
 
     int n_parametros = 2;
-    int n_puntos = 5000;
+    int n_puntos = 1000;
 
     float m = 3.0f;
     float n = 2.0f;
 
     float seed = 1;
     float learning_rate = 0.1;
-    float iterations = 1000;
+    float iterations = 3000;
     float tol_required = 0.00004;
 
     float gaussian_blurr = 0.1f;
