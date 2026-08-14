@@ -4,7 +4,7 @@
 
 #include "types.h"
 #include "amdMemoryManagement.h"
-#include "kernelLinearRegresion.h"
+#include "kernelBtchLinearRegresion.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -14,7 +14,7 @@ extern "C" {
 // return a context with all variables available
 // It has the ability to add a bias (independent term) to the data set if needed
 // The context shall be cleared with cleanContext()
-__host__ amd_linear_regression linear_regression(
+__host__ amd_linear_regression BTCH_linear_regression(
     float* point_matrix, float* result_matrix,
     unsigned int n_points, unsigned int n_parameters, unsigned int n_iter,
     float desired_tolerance, float initial_seed, float learning_rate,

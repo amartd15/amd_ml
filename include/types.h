@@ -28,6 +28,12 @@ struct tensor{
     int                     rows;
 };
 
+//For batch descent
+struct BTCH_tensor{
+    float*                  data_h;
+    float*                  data_d[2];
+};
+
 struct lr_hiperparameters{
 
     float*                  alpha; //the current learning rate in this iteration

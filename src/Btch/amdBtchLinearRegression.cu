@@ -1,5 +1,6 @@
 #include "Btch/kernelBtchLinearRegresion.h"
 #include "Btch/amdBtchLinearRegression.h"
+#include "amdMemoryManagement.h"
 
 //Some hiperparameters
 #define ITERATION_CHECK_N 100
@@ -34,8 +35,8 @@ __host__ amd_linear_regression BTCH_linear_regression(
 
     //First we register the point_matrix with pinned memory
 
-    tensor* X = BTCHpreparePointsTenstor(point_matrix, n_parameters, n_points, decision, BTCH);
-    tensor* y = BTCHcreateTensor_y(result_matrix, n_points, BTCH);
+    BTCH_tensor* X = BTCHpreparePointsTenstor(point_matrix, n_parameters, n_points, decision, BTCH);
+    BTCH_tensor* y = BTCHcreateTensor_y(result_matrix, n_points, BTCH);
 
     //Now we create the rest of the matrices used on each batch iteration
     tensor* gradient = createTensor(n_parameters, 1);

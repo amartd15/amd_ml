@@ -20,6 +20,7 @@ set(CMAKE_CUDA_ARCHITECTURES native)
 
 option(LR "Descenso en gradiente" ON)
 option(SGD "Descenso de Gradiente Estocástico" ON)
+option(Btch "Descenso en Gradiente por minilotes" ON)
 
 #Para si queremos compliar el código de la regresion lineal
 if(LR)
@@ -60,6 +61,25 @@ if(SGD)
 
 endif()
 
+if(Btch)
+    add_library(amd_ml_Btch_lib SHARED
+    src/amdMemoryManagement.cu
+    src/Btch/amdBtchLinearRegression.cu
+    src/Btch/kernelBtchLinearRegresion.cu
+    )
+
+    set_target_properties(amd_ml_Btch_lib PROPERTIES CUDA_SEPARABLE_COMPILATION OFF)
+
+    target_include_directories(amd_ml_Btch_lib PUBLIC ${CMAKE_SOURCE_DIR}/include)
+
+    target_link_libraries(amd_ml_Btch_lib PUBLIC cuda)
+
+    add_executable(amd_ml_Btch src/Btch/main_Btch.cu)
+
+    target_link_libraries(amd_ml_Btch PRIVATE amd_ml_Btch_lib)
+
+endif()
+
 #Union con python
 find_package(Python REQUIRED COMPONENTS Interpreter Development)
 find_package(pybind11 REQUIRED)
@@ -74,4 +94,8 @@ endif()
 
 if(SGD)
     target_link_libraries(amd_ml_py PRIVATE amd_ml_SGD_lib)
+endif()
+
+if(Btch)
+    target_link_libraries(amd_ml_py PRIVATE amd_ml_Btch_lib)
 endif()
