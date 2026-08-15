@@ -34,9 +34,8 @@ __host__ amd_linear_regression BTCH_linear_regression(
 ){
 
     //First we register the point_matrix with pinned memory
-
-    BTCH_tensor* X = BTCHpreparePointsTenstor(point_matrix, n_parameters, n_points, decision, BTCH);
-    BTCH_tensor* y = BTCHcreateTensor_y(result_matrix, n_points, BTCH);
+    BTCH_tensor* X   = BTCHpreparePointsTenstor(point_matrix, n_parameters, n_points, decision, BTCH);
+    BTCH_tensor* y   = BTCHcreateTensor_y(result_matrix, n_points, BTCH);
 
     //Now we create the rest of the matrices used on each batch iteration
     tensor* gradient = createTensor(n_parameters, 1);
@@ -61,6 +60,7 @@ __host__ amd_linear_regression BTCH_linear_regression(
     hiperparameters->decision        = decision;
     //Current iteration and mse created inside the kernel
 
+    //Launching the kernel
     amd_linear_regression context    = BTCHlinearRregresionKernel(
         X,
         y,
@@ -71,7 +71,6 @@ __host__ amd_linear_regression BTCH_linear_regression(
     );
 
     return context;
-
 }
 
 #ifdef __cplusplus

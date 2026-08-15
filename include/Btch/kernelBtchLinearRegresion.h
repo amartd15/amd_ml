@@ -41,7 +41,13 @@ __host__ amd_linear_regression BTCHlinearRregresionKernel(
 //-------------------------------------------------- CHECK TOLERANCES -------------------------------------------//
 
 //Identifies if we had a bouncce back
-__host__ bool lr_compare_mse(tensor* error, float* mse, float* mse_aux, lr_hiperparameters* param);
+__host__ bool BTCH_compare_mse(
+    float* mse_arr,
+    float* mse_arr_aux,
+
+    lr_hiperparameters* hp,
+    int num_BTCH
+);
 
 
 //Encapsulates the launch of a kernel that calculates the euclidean norm of an horizontal or vertical vector

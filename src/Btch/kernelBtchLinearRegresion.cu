@@ -3,22 +3,28 @@
 
 
 #define BTCH 1000
+
+
 //-------------------------------------------------- GRADENT DESCENT -------------------------------------------//
 
 //Performs the calculation of the gradent in GPU
 __global__ void lr_gradientDescent(
     const float* d_X, 
     const float* d_y, 
+
     float* param, 
     float* grad, 
     float* error,
+
     int n_points, 
     int n_param
 ){
 
+    //We calculate the thread index
     int idx = threadIdx.x + blockDim.x * blockIdx.x;
     int tdx = threadIdx.x;
 
+    //Define chared memory
     extern __shared__ float buffer[];
 
     //We create the function and calculate the error for each point
@@ -33,17 +39,15 @@ __global__ void lr_gradientDescent(
 
         error[idx] =  h - d_y[idx];
 
-    }
+    };
 
     //We calculate the gradent for each parameter
-    #pragma unroll
     for(int k = 0; k < n_param; ++k){
         buffer[tdx] = (idx < n_points) ? 2 * error[idx] * d_X[idx * n_param + k] : 0.0f;
 
         __syncthreads();
 
         //An algorithm to add all the elemtns of an array
-        #pragma unroll
         for(int j = blockDim.x / 2; j > 0; j >>= 1){
             if(tdx < j){
                 buffer[tdx] += buffer[tdx + j];
@@ -63,11 +67,14 @@ __global__ void lr_gradientDescent(
 __global__ void lr_update_param(
     float* param, 
     float* grad, 
+
     float alpha, 
+
     int n_points, 
     int n_param
 ){
 
+    //We calculate the thread index
     int idx = threadIdx.x + blockDim.x * blockIdx.x;
 
     //Update the parameters
@@ -79,18 +86,22 @@ __global__ void lr_update_param(
 
 //-------------------------------------------------- LAUNCHING KERNEL -------------------------------------------//
 
-
 //This function encapsulates the process of launching the kernel of the linear regression.
 //Only brings back to host memory the parameters matrix, the rest is kept in device memory
 __host__ amd_linear_regression BTCHlinearRregresionKernel(
     BTCH_tensor*        X, 
     BTCH_tensor*        y, 
+
     tensor*             parameters, 
     tensor*             gradient, 
     tensor*             error,
     
     lr_hiperparameters* hp //Short for hiperparameters
 ){
+
+    int num_BTCH = (int) hp->n_points / BTCH;
+
+    //---------------------Setting the kernel launching characteristics--------------------------//
 
     //We check wether there are more parameters or points in the dataset
     int length = (hp->n_param < hp->n_points) ? hp->n_points : hp->n_param;
@@ -109,7 +120,13 @@ __host__ amd_linear_regression BTCHlinearRregresionKernel(
     float  mse      = 0.0f; //To store each iteration the mse
     float* smse_aux = createSharedPointer(0.0f); //To calculate each iteration the mse
 
-    //We create the streams:
+    float  mse_arr[num_BTCH];
+    float  mse_arr_aux[num_BTCH]; 
+
+
+    //---------------------Creating streams and events--------------------------//
+
+    //We create the streams
     int n_streams = 3;
     cudaStream_t stream[n_streams];
 
@@ -121,9 +138,13 @@ __host__ amd_linear_regression BTCHlinearRregresionKernel(
     cudaEvent_t computation_done;
     CUDA_CHECK(cudaEventCreate(&computation_done), "Creating event");
 
+
+    //---------------------First iteration out of the loop--------------------------//
+
     //We copy the first time the data
     size_t offset = BTCH * sizeof(float);
 
+    //Copying the batch in the points vector
     cudaMemcpyAsync(
         (void*) X->data_d[0], 
         (const void*) X->data_h, 
@@ -135,6 +156,7 @@ __host__ amd_linear_regression BTCHlinearRregresionKernel(
         stream[0]
     );
 
+    //Copying the batch in the y vector
     cudaMemcpyAsync(
         (void*) y->data_d[0], 
         (const void*) y->data_h, 
@@ -147,10 +169,7 @@ __host__ amd_linear_regression BTCHlinearRregresionKernel(
     );
 
 
-    //An iteration counter
-    //int chunk = 0;
-    //hp->current_iter = &chunk;
-    int num_BTCH = (int) hp->n_points / BTCH;
+    //---------------------Main loop--------------------------//
 
     //The main loop of the algorithm. Encharged of processing chinks of data
     for(int iter = 0; iter < hp->iter; ++iter){
@@ -167,6 +186,7 @@ __host__ amd_linear_regression BTCHlinearRregresionKernel(
             //Beware that it must be divisible or we are accessing ilegal memory adresses
             //We start with an offset to start in 1 offset (the other was done outside)
             int offset_index   = (chunk + num_BTCH + 1) % num_BTCH; 
+
 
             //---------------------Copying the data on one stream--------------------------//
 
@@ -203,10 +223,16 @@ __host__ amd_linear_regression BTCHlinearRregresionKernel(
                 stream[stream_index_2]
             );
 
+
             //---------------------Copying the data on one stream--------------------------//
 
             //Reset the gradent
-            cudaMemsetAsync(gradient->data_d, 0, hp->n_param * sizeof(float), stream[stream_index_1]);
+            cudaMemsetAsync(
+                gradient->data_d, 
+                0, 
+                hp->n_param * sizeof(float), 
+                stream[stream_index_1]
+            );
 
             //Calculate the gradent
             lr_gradientDescent<<<numBlocks, numThreads, shared_mem, stream[stream_index_1]>>>(
@@ -228,22 +254,42 @@ __host__ amd_linear_regression BTCHlinearRregresionKernel(
                 hp->n_param
             );
 
+            //We create an event
             cudaEventRecord(computation_done, stream[stream_index_1]);
 
-            cudaStreamWaitEvent(stream[stream_index_2], computation_done, 0);
+            //We syncronize the event on the kernel stream
+            cudaStreamWaitEvent(stream[stream_index_2], computation_done, cudaEventWaitDefault);
+
+            //---------------------CAlculating error--------------------------//
+
+            if(iter % hp->first_iteration == 0 && iter != hp->first_iteration){
+                lr_norm(error, smse_aux);
+                mse_arr[chunk] = *smse_aux;
+            };
         }; //for(int chunk = 0; chunk < num_BTCH; ++chunk)
+
+        if(iter % hp->first_iteration == 0){
+
+            //We get a first value of mse_arr
+            if(iter == hp->first_iteration){
+                for(int i = 0; i < num_BTCH; ++i){
+                    mse_arr_aux[i] = mse_arr[i];
+                };   
+            };
+
+            if(!BTCH_compare_mse(&mse_arr[0], &mse_arr_aux[0], hp, num_BTCH)){ break; };
+        };
 
     };//for(int iter = 0; iter < hp->iter; ++iter)
     
+
+    //---------------------Cleanning the device, streams and events--------------------------//
 
     //We check for silent errors
     CUDA_CHECK(cudaGetLastError(), "Launching the kernels of the linear regression");
 
     //We syncronize de device
     CUDA_CHECK(cudaDeviceSynchronize(), "Device syncronization");  
-
-    //We bring back only the parameters
-    copyMemory(parameters, DEVICE_TO_HOST);
 
     //Free shared pointers
     CUDA_CHECK(cudaFree(smse_aux), "Free smse_aux");
@@ -260,6 +306,12 @@ __host__ amd_linear_regression BTCHlinearRregresionKernel(
     //DEleting the event
     CUDA_CHECK(cudaEventDestroy(computation_done), "Destroying event");
 
+
+    //---------------------Retrieveing the data--------------------------//
+
+    //We bring back only the parameters
+    copyMemory(parameters, DEVICE_TO_HOST);
+
     //We get the mse
     hp->mse                          = mse;
 
@@ -275,10 +327,10 @@ __host__ amd_linear_regression BTCHlinearRregresionKernel(
     context.point_matrix->rows       = hp->n_points;
     context.point_matrix->columns    = hp->n_param;
 
-    context.result_matrix->data_d     = y->data_d[0];
-    context.result_matrix->data_h     = y->data_h;
-    context.result_matrix->rows       = hp->n_points;
-    context.result_matrix->columns    = 1;
+    context.result_matrix->data_d    = y->data_d[0];
+    context.result_matrix->data_h    = y->data_h;
+    context.result_matrix->rows      = hp->n_points;
+    context.result_matrix->columns   = 1;
 
     //We fill the context
     context.parameters               = parameters;
@@ -289,50 +341,54 @@ __host__ amd_linear_regression BTCHlinearRregresionKernel(
 
     return context;
 };
+
+
 //-------------------------------------------------- CHECK TOLERANCES -------------------------------------------//
 
-
 //Identifies if we had a bounce back
-__host__ bool lr_compare_mse(
-    tensor* error, 
-    float* mse, 
-    float* mse_aux, 
-    lr_hiperparameters* hp
+__host__ bool BTCH_compare_mse(
+    float* mse_arr,
+    float* mse_arr_aux,
+
+    lr_hiperparameters* hp,
+    int num_BTCH
 ){
-    
-    if(*hp->current_iter % hp->first_iteration != 0) { return true; }
 
-    //Calculate the mse of this iteration
-    lr_norm(error, mse_aux);
+    //We check the tolerance
+    float mean_mse = 0;
+    for(int i = 0; i < num_BTCH; ++i){
+        mean_mse += mse_arr[i];
+    };  
 
-    //Bring back the result
-    CUDA_CHECK(cudaDeviceSynchronize(), "Syncronizing");
-    
-    //If we detect a bounce back, we modify the learning rate
-    if (
-        (*mse < *mse_aux) &&
-        (*hp->current_iter != hp->first_iteration) //For not reducing the learning rate at the beggining
-    ){
-        *hp->alpha *= hp->alpha_reduction; //Reduce the learning rate
+    mean_mse = mean_mse / num_BTCH;
 
-        if(*hp->alpha <= hp->alpha_min) {return false;}
-
-        std::cout << "Se ha cambiado la tasa de aprendizaje en la " 
-                  << *hp->current_iter << " iteracion. Alpha = "
-                  << *hp->alpha << std::endl;
-    }
-
-    //We swap the values
-    *mse = *mse_aux;
-
-    //We check if the tolerance is met
-    if(*mse <= hp->tol){
-        std::cout << "Se ha alcanzado la tolerancia esperada a las " 
-                  << *hp->current_iter 
-                  << " iteraciones\n" 
-                  << std::endl;
+    if(mean_mse < hp->tol){
+        std::cout << "Tolerance met" << std::endl;
         return false;
-    }
+    };    
+
+    //We check how many times we had a bounce back
+    int n_bounces = 0;
+
+    for(int i = 0; i < num_BTCH; ++i){
+        if(mse_arr_aux[i] - mse_arr[i] < 0){ 
+            n_bounces++; 
+            std::cout << "Bounce detected" << std::endl;
+        };
+    };  
+
+    //If more than half of the batches had a bounce back, we reduce the learning rate
+    if(n_bounces > num_BTCH / 2){
+        *hp->alpha *= hp->alpha_reduction;
+        std::cout << "REducing learning rate" << std::endl;
+
+        if(*hp->alpha < hp->alpha_min){ return false; };
+    };
+
+    //Finally, we exchange values
+    for(int i = 0; i < num_BTCH; ++i){
+            mse_arr_aux[i] = mse_arr[i];
+    }   
 
     return true;
 }
@@ -360,9 +416,10 @@ __host__ void lr_norm(
     //Shared memory
     int sharedMem = numThreads.x * sizeof(float);
 
-    //We launch the kernel
+    //We set the memory to 0 blocking the GPU
     cudaMemsetAsync(mse_aux, 0, sizeof(float));
     
+    //We launch the kernel
     lr_kernel_norm<<<numBlocks, numThreads, sharedMem>>>(error->data_d, mse_aux, size);
 
     //We check for silent errors during the kernel launch
