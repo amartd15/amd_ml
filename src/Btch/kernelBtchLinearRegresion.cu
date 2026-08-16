@@ -2,7 +2,7 @@
 #include "amdMemoryManagement.h"
 
 
-#define BTCH 1000
+#define BTCH 100
 
 
 //-------------------------------------------------- GRADENT DESCENT -------------------------------------------//
@@ -120,23 +120,28 @@ __host__ amd_linear_regression BTCHlinearRregresionKernel(
     float  mse      = 0.0f; //To store each iteration the mse
     float* smse_aux = createSharedPointer(0.0f); //To calculate each iteration the mse
 
-    float  mse_arr[num_BTCH];
-    float  mse_arr_aux[num_BTCH]; 
+    float*  mse_arr = (float*)malloc(num_BTCH * sizeof(float));
+    float*  mse_arr_aux = (float*)malloc(num_BTCH * sizeof(float)); 
 
 
     //---------------------Creating streams and events--------------------------//
 
     //We create the streams
-    int n_streams = 3;
+    int n_streams = 2;
     cudaStream_t stream[n_streams];
 
     for(int i = 0; i < n_streams; ++i){
         CUDA_CHECK(cudaStreamCreate(&stream[i]), "Creating stream");
     }
 
+    //For errors
+    cudaStream_t error_stream;
+    CUDA_CHECK(cudaStreamCreate(&error_stream), "Creating stream for error");
+
     //We create an event
-    cudaEvent_t computation_done;
+    cudaEvent_t computation_done, error_event;
     CUDA_CHECK(cudaEventCreate(&computation_done), "Creating event");
+    CUDA_CHECK(cudaEventCreate(&error_event), "Creating event for error");
 
 
     //---------------------First iteration out of the loop--------------------------//
@@ -171,8 +176,9 @@ __host__ amd_linear_regression BTCHlinearRregresionKernel(
 
     //---------------------Main loop--------------------------//
 
-    //The main loop of the algorithm. Encharged of processing chinks of data
+    //The main loop of the algorithm. Encharged of processing chunks of data
     for(int iter = 0; iter < hp->iter; ++iter){
+        hp->current_iter = &iter;
         for(int chunk = 0; chunk < num_BTCH; ++chunk){
 
             //We will use one stream to upload memory and one for launching the kernel
@@ -192,7 +198,8 @@ __host__ amd_linear_regression BTCHlinearRregresionKernel(
 
             //For the last batch
             if(chunk == num_BTCH - 1){
-                offset = hp->n_points - chunk*BTCH*sizeof(float);
+                offset = hp->n_points - chunk*BTCH;
+                offset *= sizeof(float);
             };
 
             //The memory transfers
@@ -262,13 +269,21 @@ __host__ amd_linear_regression BTCHlinearRregresionKernel(
 
             //---------------------CAlculating error--------------------------//
 
-            if(iter % hp->first_iteration == 0 && iter != hp->first_iteration){
-                lr_norm(error, smse_aux);
+            if(
+                //We dont want to calculate the error at first iteration, only at 100, 200, ...
+                iter % hp->first_iteration == 0 && 
+                iter != 0
+            ){
+                lr_norm(error, smse_aux, error_stream, error_event);
                 mse_arr[chunk] = *smse_aux;
             };
         }; //for(int chunk = 0; chunk < num_BTCH; ++chunk)
 
-        if(iter % hp->first_iteration == 0){
+        if(
+            //We dont want to calculate the error at first iteration, only at 100, 200, ...
+            iter % hp->first_iteration == 0     && 
+            iter != 0
+        ){
 
             //We get a first value of mse_arr
             if(iter == hp->first_iteration){
@@ -277,8 +292,9 @@ __host__ amd_linear_regression BTCHlinearRregresionKernel(
                 };   
             };
 
-            if(!BTCH_compare_mse(&mse_arr[0], &mse_arr_aux[0], hp, num_BTCH)){ break; };
-        };
+            //We compare the mse and stop the loop if needed
+            if(!BTCH_compare_mse(mse_arr, mse_arr_aux, hp, num_BTCH)){ break; };
+        }; //if(iter % hp->first_iteration == 0)
 
     };//for(int iter = 0; iter < hp->iter; ++iter)
     
@@ -302,6 +318,8 @@ __host__ amd_linear_regression BTCHlinearRregresionKernel(
     for(int i = 0; i < n_streams; ++i){
         CUDA_CHECK(cudaStreamDestroy(stream[i]), "Destroying stream");
     }
+
+    CUDA_CHECK(cudaStreamDestroy(error_stream), "Destroying stream for error");
 
     //DEleting the event
     CUDA_CHECK(cudaEventDestroy(computation_done), "Destroying event");
@@ -362,6 +380,14 @@ __host__ bool BTCH_compare_mse(
 
     mean_mse = mean_mse / num_BTCH;
 
+    std::cout   << "iter= " << *hp->current_iter 
+                << " mean_mse=" << mean_mse 
+                << " alpha= " << *hp->alpha
+                << std::endl;
+
+    //if(*hp->alpha < hp->alpha_min) { return true; };
+
+
     if(mean_mse < hp->tol){
         std::cout << "Tolerance met" << std::endl;
         return false;
@@ -369,21 +395,27 @@ __host__ bool BTCH_compare_mse(
 
     //We check how many times we had a bounce back
     int n_bounces = 0;
+    float margin  = 0.01; //If the bounce back is more than a 1%
 
     for(int i = 0; i < num_BTCH; ++i){
-        if(mse_arr_aux[i] - mse_arr[i] < 0){ 
-            n_bounces++; 
-            std::cout << "Bounce detected" << std::endl;
+        if(mse_arr_aux[i]*(1 + margin) - mse_arr[i] < 0){ 
+            n_bounces++;
         };
     };  
 
     //If more than half of the batches had a bounce back, we reduce the learning rate
-    if(n_bounces > num_BTCH / 2){
-        *hp->alpha *= hp->alpha_reduction;
-        std::cout << "REducing learning rate" << std::endl;
+    float bounce_ratio = 0.5f;
+    if(n_bounces > (num_BTCH + 1) * bounce_ratio){
+        std::cout << "Bounce detected in iteration " << *hp->current_iter << std::endl;
 
-        if(*hp->alpha < hp->alpha_min){ return false; };
-    };
+        *hp->alpha *= hp->alpha_reduction;
+        std::cout << "Reducing learning rate" << std::endl;
+
+        if(*hp->alpha < hp->alpha_min){
+            std::cout << "Learning rate too low" << std::endl;
+            return false; 
+        };
+    }; //if(n_bounces > ((num_BTCH + 1) / 2))
 
     //Finally, we exchange values
     for(int i = 0; i < num_BTCH; ++i){
@@ -397,8 +429,12 @@ __host__ bool BTCH_compare_mse(
 //Encapsulates the launch of a kernel that calculates the euclidean norm of an horizontal or vertical vector
 __host__ void lr_norm(
     tensor* error, 
-    float* mse_aux
+    float* mse_aux,
+
+    cudaStream_t error_stream,
+    cudaEvent_t  error_event
 ){
+
     int size;
 
     //We calculate wether the vector is a row or a column
@@ -417,10 +453,14 @@ __host__ void lr_norm(
     int sharedMem = numThreads.x * sizeof(float);
 
     //We set the memory to 0 blocking the GPU
-    cudaMemsetAsync(mse_aux, 0, sizeof(float));
+    cudaMemsetAsync(mse_aux, 0, sizeof(float), error_stream);
     
     //We launch the kernel
-    lr_kernel_norm<<<numBlocks, numThreads, sharedMem>>>(error->data_d, mse_aux, size);
+    lr_kernel_norm<<<numBlocks, numThreads, sharedMem, error_stream>>>(error->data_d, mse_aux, size);
+
+    //Syncronizing
+    CUDA_CHECK(cudaEventRecord(error_event, error_stream), "REcording event for error");
+    CUDA_CHECK(cudaEventSynchronize(error_event), "Syncronizing event for error");
 
     //We check for silent errors during the kernel launch
     CUDA_CHECK(cudaGetLastError(), "Lunching the kernels of calculations of norms");
@@ -438,8 +478,6 @@ __global__ void lr_kernel_norm(
 
     int idx = threadIdx.x + blockDim.x * blockIdx.x;
     int tdx = threadIdx.x;
-
-    if(idx == 0) { *value = 0; } //Reset the value to 0, the operation is so fast no race conditions should be possible
 
     //We fill the shared memory with each element of the error squared
     buffer[tdx] = (idx < size) ? data[idx] * data[idx] / size : 0.0f;

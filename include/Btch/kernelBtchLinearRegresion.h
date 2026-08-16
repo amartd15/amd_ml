@@ -51,7 +51,13 @@ __host__ bool BTCH_compare_mse(
 
 
 //Encapsulates the launch of a kernel that calculates the euclidean norm of an horizontal or vertical vector
-__host__ void lr_norm(tensor* error, float* mse_aux);
+__host__ void lr_norm(
+    tensor* error, 
+    float* mse_aux,
+
+    cudaStream_t error_stream,
+    cudaEvent_t  error_event
+);
 
 
 //Performs the euclidean norm of a vactor in GPU

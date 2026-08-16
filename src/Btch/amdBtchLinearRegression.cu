@@ -4,9 +4,9 @@
 
 //Some hiperparameters
 #define ITERATION_CHECK_N 100
-#define LEARNING_RATE_REDUCTION 0.1f
-#define MINIMUM_LEARNING_RATE 1e-4f
-#define BTCH 1000
+#define LEARNING_RATE_REDUCTION 0.5f
+#define MINIMUM_LEARNING_RATE 1e-5f
+#define BTCH 100
 
 #ifdef __cplusplus
 extern "C" {
